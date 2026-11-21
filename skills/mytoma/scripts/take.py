@@ -122,6 +122,12 @@ def cmd_trim(args):
     print(f"→ voice.wav · words.json · transcript.txt · take.json\nNext: fixes.json if needed, then captions.py {work}")
 
 
+def frame_at(t):
+    """Edit seconds to a frame index, rounding halves up like Math.round in engine.js.
+    Python's round() rounds halves to even, so 41.15 s would give frame 1234 here and 1235 in faceCam()."""
+    return math.floor(t * FPS + 0.5)
+
+
 def parse_ranges(text):
     out = []
     for part in text.split(","):
@@ -158,7 +164,7 @@ def cmd_face(args):
     face.mkdir(exist_ok=True)
     total = 0
     for a, b in parse_ranges(args.ranges):
-        f0, f1 = round(a * FPS), round(b * FPS)
+        f0, f1 = frame_at(a), frame_at(b)
         if f1 / FPS > take["duration"] + 1e-6:
             sys.exit(f"Range {a}-{b} ends after the trimmed take ({take['duration']:.2f}s)")
         start = take["in"] + f0 / FPS
