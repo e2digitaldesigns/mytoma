@@ -16,6 +16,9 @@ export default function RendersPanel({ state }) {
           <a href={`${base}/${o.url}`} download={o.file}>Download {o.file}</a>
         </div>
       ))}
+      {state.credits && (
+        <p className="hint">Image credits for the description (required for the photos used): <a href={`${base}/${state.credits}?v=${state.images.length}`} download="credits.txt">credits.txt</a></p>
+      )}
       {state.captions && (
         <p className="hint">Subtitles for upload: <a href={`${base}/captions.srt`} download>captions.srt</a> · <a href={`${base}/captions.vtt`} download>captions.vtt</a></p>
       )}

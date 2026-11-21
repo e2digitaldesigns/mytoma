@@ -7,6 +7,7 @@ import Inspector from "./Inspector.jsx";
 import MediaPanel from "./MediaPanel.jsx";
 import ClaudePanel from "./ClaudePanel.jsx";
 import RendersPanel from "./RendersPanel.jsx";
+import ImagesPanel from "./ImagesPanel.jsx";
 import JobsDrawer from "./JobsDrawer.jsx";
 
 export default function Editor({ id }) {
@@ -132,7 +133,7 @@ export default function Editor({ id }) {
 
       <div className="left">
         <div className="tabs">
-          {[["media", "Media"], ["transcript", "Transcript"], ["claude", "Claude"], ["renders", `Renders${state.outputs.length ? ` (${state.outputs.length})` : ""}`]].map(([k, label]) => (
+          {[["media", "Media"], ["transcript", "Transcript"], ["images", "Find images"], ["claude", "Claude"], ["renders", `Renders${state.outputs.length ? ` (${state.outputs.length})` : ""}`]].map(([k, label]) => (
             <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{label}</button>
           ))}
         </div>
@@ -150,6 +151,7 @@ export default function Editor({ id }) {
               }}
               onSaved={(s) => { setState(s); setReloadKey((k) => k + 1); }} notify={notify} />
           )}
+          {tab === "images" && <ImagesPanel state={state} onChanged={(next) => setState(next)} notify={notify} />}
           {tab === "claude" && <ClaudePanel state={state} />}
           {tab === "renders" && <RendersPanel state={state} />}
         </div>

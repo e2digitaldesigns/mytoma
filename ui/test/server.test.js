@@ -15,12 +15,35 @@ execFileSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "color=c=gray:
   "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", path.join(media, "take.mp4")]);
 fs.writeFileSync(path.join(tmp, "secret.mp4"), "not media");
 
+// A stand-in for the skill's Python, so the image endpoints run without the network: it answers find_media.py's
+// --search-only and --add the way the real script does (find_media.py's own tests cover the searching)
+const fakePython = path.join(tmp, "fake-python.js");
+fs.writeFileSync(fakePython, `#!/usr/bin/env node
+const fs = require("fs"), path = require("path");
+const [script, work, ...args] = process.argv.slice(2);
+fs.appendFileSync(${JSON.stringify(path.join(tmp, "python-calls.txt"))}, JSON.stringify([path.basename(script), ...args]) + "\\n");
+if (args.includes("--search-only")) {
+  console.log(JSON.stringify({ query: args[0], candidates: [{ id: "c1", source: "commons", title: "Fries", author: "Jane", licence: "CC BY-SA 4.0",
+    thumb_url: "https://upload.wikimedia.org/t.jpg", page_url: "https://commons.wikimedia.org/wiki/File:Fries.jpg", width: 2400, height: 1600 }],
+    skipped: [{ title: "Menu", reason: "non-commercial (NC)" }], messages: [] }));
+} else if (args.includes("--add")) {
+  fs.mkdirSync(path.join(work, "assets"), { recursive: true });
+  fs.writeFileSync(path.join(work, "assets", "fries-01.jpg"), "jpeg");
+  const entry = { file: "assets/fries-01.jpg", title: "Fries", author: "Jane", source: "Wikimedia Commons",
+    source_url: "https://commons.wikimedia.org/wiki/File:Fries.jpg", licence: "CC BY-SA 4.0", licence_url: "https://creativecommons.org/licenses/by-sa/4.0/" };
+  fs.writeFileSync(path.join(work, "credits.json"), JSON.stringify([entry]));
+  fs.writeFileSync(path.join(work, "credits.txt"), "Image credits:\\n\\"Fries\\" by Jane\\n");
+  console.log(JSON.stringify({ saved: [entry], messages: [] }));
+}
+`);
+fs.chmodSync(fakePython, 0o755);
+
 let server, base;
 const port = 4300 + Math.floor(Math.random() * 500);
 
 async function start(env) {
   const proc = spawn(process.execPath, [path.join(here, "..", "server", "index.js")], {
-    env: { ...process.env, MYTOMA_PROJECTS: path.join(tmp, "projects"), MYTOMA_MEDIA: media, MYTOMA_PORT: String(port), ...env },
+    env: { ...process.env, MYTOMA_PROJECTS: path.join(tmp, "projects"), MYTOMA_MEDIA: media, MYTOMA_PORT: String(port), MYTOMA_PYTHON: fakePython, ...env },
     stdio: ["ignore", "pipe", "pipe"],
   });
   await new Promise((resolve, reject) => {
@@ -100,6 +123,27 @@ test("project files are served for the preview, with no way out of the project",
   assert.equal((await req("GET", "/files/my-first-video/..%2Fmy-first-video-2%2Fproject.json")).status, 400);
   assert.equal((await req("GET", "/files/my-first-video/.hidden")).status, 400);
   assert.equal((await req("GET", "/files/MY-FIRST/index.html")).status, 400);
+});
+
+test("find images: search, add to the project, and the credits come with them", async () => {
+  const id = "my-first-video";
+  assert.equal((await req("POST", `/api/projects/${id}/images/search`, { query: " " })).status, 400);
+  const found = await req("POST", `/api/projects/${id}/images/search`, { query: "thick fries", orientation: "portrait", minWidth: 900 });
+  assert.equal(found.status, 200, JSON.stringify(found.data));
+  assert.deepEqual(found.data.candidates.map((candidate) => [candidate.id, candidate.licence]), [["c1", "CC BY-SA 4.0"]]);
+  assert.equal(found.data.skipped[0].reason, "non-commercial (NC)");
+  assert.equal((await req("POST", `/api/projects/${id}/images/add`, { ids: ["../x"] })).status, 400);
+  const added = await req("POST", `/api/projects/${id}/images/add`, { ids: ["c1"], name: "Thick Fries!" });
+  assert.equal(added.status, 200, JSON.stringify(added.data));
+  assert.deepEqual(added.data.state.images.map((image) => [image.file, image.credit.author]), [["assets/fries-01.jpg", "Jane"]]);
+  assert.equal(added.data.state.credits, "credits.txt");
+  const calls = fs.readFileSync(path.join(tmp, "python-calls.txt"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
+  assert.deepEqual(calls[0], ["find_media.py", "thick fries", "--search-only", "--orientation", "portrait", "--min-width", "900", "--json"]);
+  assert.deepEqual(calls[1], ["find_media.py", "--add", "c1", "--name", "thick-fries", "--json"]);
+  // the Renders tab's credits download
+  const credits = await req("GET", `/files/${id}/credits.txt`);
+  assert.equal(credits.status, 200);
+  assert.match(credits.data, /"Fries" by Jane/);
 });
 
 test("a job runs to completion and its events stream", async () => {

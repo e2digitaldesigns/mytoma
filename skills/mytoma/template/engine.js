@@ -259,7 +259,10 @@
     await Promise.all(loads);
     await document.fonts.ready;
     await Promise.all(Array.from(document.images).map((img) => (img.complete ? img.decode().catch(() => {}) : new Promise((r) => { img.onload = img.onerror = r; }).then(() => img.decode().catch(() => {})))));
-    const broken = Array.from(document.images).filter((img) => !img.dataset.frames && !img.naturalWidth).map((img) => img.getAttribute("src"));
+    const unloaded = Array.from(document.images).filter((img) => !img.dataset.frames && !img.naturalWidth);
+    // a missing photo is a check finding (and render refuses to start); any other broken image fails the page
+    window.MT_INFO.missingPhotos = unloaded.filter((img) => img.classList.contains("mt-photo")).map((img) => img.getAttribute("src"));
+    const broken = unloaded.filter((img) => !img.classList.contains("mt-photo")).map((img) => img.getAttribute("src"));
     if (broken.length) throw new Error("images failed to load: " + broken.join(", "));
     await renderAt(0);
     return true;
@@ -490,6 +493,242 @@
     });
   }
 
+  /* ---------- photos (find_media.py saves them into assets/) ---------- */
+
+  const PHOTOS = [];   // {selector, source, start, end}
+  const PHOTO_TINTS = ["brand", "dark", "none"];
+  const PHOTO_MOVES = ["in", "out", "left", "right", "up", "down", "none"];
+
+  // photo("#p02", 4.7, 8.6, {move: "in", tint: "brand", strength: 0.55, mono: false, focus: "50% 40%", zoom: 1.12})
+  // A full-frame <img> behind the shot's text: cover-cropped for any format, a slow Ken Burns move across [start, end),
+  // and a tint from the brand colours over it so the text stays readable (check measures that contrast).
+  //   tint "brand": the photo takes the primary colour's hue, then darkens toward --brand-bg · "dark": darkens only
+  //   strength: how far toward --brand-bg (0..1) · mono: black and white first (archival photos, engravings)
+  function photo(selector, start, end, options = {}) {
+    const image = must(selector, "photo")[0];
+    if (image.tagName !== "IMG") throw new Error(`photo(): ${selector} must be an <img>`);
+    if (!(end > start)) throw new Error(`photo(${selector}): end ${end} must be after start ${start}`);
+    const settings = Object.assign({ move: "in", tint: "brand", strength: 0.55, mono: false, focus: "50% 50%", zoom: 1.12 }, options);
+    if (!PHOTO_TINTS.includes(settings.tint)) throw new Error(`photo(${selector}): tint must be one of ${PHOTO_TINTS.join(", ")}`);
+    if (!PHOTO_MOVES.includes(settings.move)) throw new Error(`photo(${selector}): move must be one of ${PHOTO_MOVES.join(", ")}`);
+    const strength = Math.max(0, Math.min(1, Number(settings.strength)));
+    const shotElement = image.closest(".shot");
+    if (shotElement) shotElement.style.isolation = "isolate";   // the photo and its tint stay behind this shot's text only
+    image.classList.add("mt-photo");
+    image.loading = "eager";
+    image.decoding = "sync";
+    image.style.objectPosition = settings.focus;
+    if (settings.mono) image.style.filter = "grayscale(1) contrast(1.08)";
+
+    // tint layers sit right after the image, in paint order: the colour wash, then the shade
+    let anchor = image;
+    const layer = (className, background, extra = {}) => {
+      const element = document.createElement("div");
+      element.className = `mt-photo-tint ${className}`;
+      element.style.background = background;
+      Object.assign(element.style, extra);
+      anchor.after(element);
+      anchor = element;
+    };
+    if (settings.tint === "brand") layer("mt-photo-wash", "var(--brand-primary)", { mixBlendMode: "color", opacity: "0.6" });
+    if (settings.tint !== "none" && strength > 0) {
+      const percent = (value) => `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`;
+      const shade = (value) => `color-mix(in srgb, var(--brand-bg) ${percent(value)}, transparent)`;
+      // a little darker at the top and bottom, where headlines and captions sit
+      layer("mt-photo-shade", `linear-gradient(180deg, ${shade(strength + 0.12)} 0%, ${shade(strength)} 30%, ${shade(strength)} 62%, ${shade(strength + 0.15)} 100%)`);
+    }
+
+    // Ken Burns: the image stays scaled to at least `zoom` while it pans, so its edges never show
+    const zoom = Math.max(1.02, Number(settings.zoom) || 1.12);
+    const travel = ((zoom - 1) / 2) * 100 * 0.8;
+    const moves = {
+      in: [{ scale: 1.02 }, { scale: zoom }],
+      out: [{ scale: zoom }, { scale: 1.02 }],
+      left: [{ scale: zoom, xPercent: travel }, { scale: zoom, xPercent: -travel }],
+      right: [{ scale: zoom, xPercent: -travel }, { scale: zoom, xPercent: travel }],
+      up: [{ scale: zoom, yPercent: travel }, { scale: zoom, yPercent: -travel }],
+      down: [{ scale: zoom, yPercent: -travel }, { scale: zoom, yPercent: travel }],
+    };
+    if (settings.move !== "none") {
+      const [from, to] = moves[settings.move];
+      tl.fromTo(image, from, Object.assign({ duration: end - start, ease: "none" }, to), start);
+    }
+
+    PHOTOS.push({ selector: typeof selector === "string" ? selector : "#" + image.id, source: image.getAttribute("src") || "", start, end });
+    // The frame is captured only once the photo has decoded (a fresh page, or Chromium dropping a decoded image)
+    addDrawer((time) => {
+      if (time < start || time >= end || !image.naturalWidth) return;
+      return image.decode().catch(() => {});
+    });
+    return end;
+  }
+
+  /* ---------- contrast of text over photos (check) ---------- */
+
+  // WCAG AA: 4.5:1, or 3:1 for large text (24px, or 18.66px bold, on a ~400px-wide phone screen, scaled to this
+  // canvas). Captions always need 4.5:1.
+  function relativeLuminance([red, green, blue]) {
+    const channel = (value) => { const fraction = value / 255; return fraction <= 0.03928 ? fraction / 12.92 : ((fraction + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue);
+  }
+  function contrastRatio(first, second) {
+    const [lighter, darker] = [relativeLuminance(first), relativeLuminance(second)].sort((one, other) => other - one);
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+  function parseColour(text) {
+    const numbers = (String(text).match(/[\d.]+/g) || []).map(Number);
+    const alpha = numbers[3] === undefined ? 1 : numbers[3];
+    if (/^color\(srgb/.test(text)) return [numbers[0] * 255, numbers[1] * 255, numbers[2] * 255, alpha];
+    return [numbers[0] || 0, numbers[1] || 0, numbers[2] || 0, alpha];
+  }
+  function opacityInside(element, root) {
+    let opacity = 1;
+    for (let node = element; node && node !== root.parentNode && node.nodeType === 1; node = node.parentNode) opacity *= Number(getComputedStyle(node).opacity);
+    return opacity;
+  }
+  function overlaps(first, second) {
+    return first.left < second.right && second.left < first.right && first.top < second.bottom && second.top < first.bottom;
+  }
+
+  // The element's four corners on screen, transforms included (a stamp is rotated: its bounding box is not its shape).
+  // Inline elements cannot be transformed, so their box is their shape.
+  function cornerQuad(element, style) {
+    if (style.display === "inline") return null;
+    const previous = element.style.position;
+    if (style.position === "static") element.style.position = "relative";
+    const corners = [[0, 0], [1, 0], [1, 1], [0, 1]].map(([across, down]) => {
+      const marker = document.createElement("i");
+      marker.style.cssText = `position:absolute;left:${across * 100}%;top:${down * 100}%;width:0;height:0;margin:0;padding:0;border:0`;
+      element.appendChild(marker);
+      const point = marker.getBoundingClientRect();
+      marker.remove();
+      return [point.left, point.top];
+    });
+    element.style.position = previous;
+    return corners;
+  }
+  function insideQuad(quad, horizontal, vertical) {
+    let sign = 0;
+    for (let index = 0; index < 4; index++) {
+      const [startX, startY] = quad[index], [endX, endY] = quad[(index + 1) % 4];
+      const cross = (endX - startX) * (vertical - startY) - (endY - startY) * (horizontal - startX);
+      if (Math.abs(cross) < 1e-9) continue;
+      if (sign && Math.sign(cross) !== sign) return false;
+      sign = Math.sign(cross);
+    }
+    return true;
+  }
+
+  let contrastHidden = [];
+  // Step 1, after renderAt(t): the text drawn over a visible photo. Their glyphs stay hidden until contrastMeasure(),
+  // so the renderer can screenshot exactly what is behind them.
+  function contrastTargets(time) {
+    const liveShots = SHOTS.filter((entry) => time >= entry.s && time < entry.e).map((entry) => document.getElementById(entry.id));
+    const photoBoxes = [];
+    for (const root of liveShots) {
+      for (const image of root.querySelectorAll("img.mt-photo")) {
+        if (image.naturalWidth && opacityInside(image, root) > 0.05) photoBoxes.push(image.getBoundingClientRect());
+      }
+    }
+    if (!photoBoxes.length) return [];
+    const largeSize = (24 * Math.min(W, H)) / 400, largeBoldSize = (18.66 * Math.min(W, H)) / 400;
+    const targets = [];
+    const consider = (element, root, caption) => {
+      const style = getComputedStyle(element);
+      if (style.visibility === "hidden" || element.closest("[data-check=off]")) return;
+      const opacity = opacityInside(element, root);
+      if (opacity < 0.05) return;
+      // mid-entry (a pop, a rise, a slam) the text and its card are half drawn: judge the frame it settles on
+      if (!caption && inMotion(element, root, time)) return;
+      let box = element.getBoundingClientRect();
+      if (style.display === "inline") {
+        // an inline box can hang past its line (font ascent and descent vs line-height); its glyphs stay inside the block
+        let block = element.parentElement;
+        while (block && block !== root && getComputedStyle(block).display === "inline") block = block.parentElement;
+        if (block) {
+          const outer = block.getBoundingClientRect();
+          const left = Math.max(box.left, outer.left), top = Math.max(box.top, outer.top);
+          box = { left, top, width: Math.min(box.right, outer.right) - left, height: Math.min(box.bottom, outer.bottom) - top };
+          box.right = box.left + box.width;
+          box.bottom = box.top + box.height;
+        }
+      }
+      if (box.width < 2 || box.height < 2 || !photoBoxes.some((photoBox) => overlaps(box, photoBox))) return;
+      const fontSize = parseFloat(style.fontSize), bold = Number(style.fontWeight) >= 700;
+      const large = !caption && (fontSize >= largeSize || (bold && fontSize >= largeBoldSize));
+      const stroke = parseFloat(style.webkitTextStrokeWidth) >= 2 ? parseColour(style.webkitTextStrokeColor) : null;
+      const text = `"${element.textContent.trim().slice(0, 24)}"`;
+      const name = element.id ? "#" + element.id : element.className ? "." + String(element.className).split(" ")[0] : element.tagName.toLowerCase();
+      const colour = parseColour(style.color);
+      colour[3] *= opacity;
+      targets.push({ label: caption ? `captions ${text}` : `${name} ${text}`, shot: caption ? "captions" : root.id, large, colour, stroke,
+        box: { left: box.left, top: box.top, width: box.width, height: box.height }, quad: cornerQuad(element, style) });
+      // hidden only after every colour is read: hiding a heading also hides its child spans' colour
+      contrastHidden.push(element);
+    };
+    for (const root of liveShots) {
+      for (const element of root.querySelectorAll("*")) {
+        if (Array.from(element.childNodes).some((node) => node.nodeType === 3 && node.textContent.trim())) consider(element, root, false);
+      }
+    }
+    const captions = document.getElementById("captions");
+    if (captions && captions.style.visibility !== "hidden") {
+      for (const word of captions.querySelectorAll(".w")) consider(word, captions, true);
+    }
+    for (const element of contrastHidden) element.dataset.mtHideGlyphs = "";
+    return targets;
+  }
+
+  // Step 2: `screenshot` is a data: URL of the frame with those glyphs hidden. Returns {key, measured, message} for each
+  // target that fails: the contrast of its colour against what is behind it, judged on the worst 5% of the element's
+  // own shape (a few bright specks pass; a bright patch fails). A text outline (the captions' stroke) counts as background.
+  async function contrastMeasure(screenshot, targets) {
+    for (const element of contrastHidden) delete element.dataset.mtHideGlyphs;
+    contrastHidden = [];
+    if (!targets.length) return [];
+    const picture = new Image();
+    picture.src = screenshot;
+    await picture.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = picture.naturalWidth;
+    canvas.height = picture.naturalHeight;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    context.drawImage(picture, 0, 0);
+    const scale = picture.naturalWidth / W;
+    const findings = [];
+    for (const target of targets) {
+      const left = Math.max(0, Math.floor(target.box.left * scale)), top = Math.max(0, Math.floor(target.box.top * scale));
+      const right = Math.min(canvas.width, Math.ceil((target.box.left + target.box.width) * scale));
+      const bottom = Math.min(canvas.height, Math.ceil((target.box.top + target.box.height) * scale));
+      const width = right - left, height = bottom - top;
+      if (width < 1 || height < 1) continue;
+      const pixels = context.getImageData(left, top, width, height).data;
+      const step = Math.max(1, Math.floor(Math.sqrt((width * height) / 4000)));
+      const alpha = target.colour[3];
+      const ratios = [];
+      for (let row = 0; row < height; row += step) {
+        for (let column = 0; column < width; column += step) {
+          if (target.quad && !insideQuad(target.quad, (left + column + 0.5) / scale, (top + row + 0.5) / scale)) continue;
+          const offset = (row * width + column) * 4;
+          let behind = [pixels[offset], pixels[offset + 1], pixels[offset + 2]];
+          if (target.stroke) behind = behind.map((value, channel) => target.stroke[channel] * target.stroke[3] + value * (1 - target.stroke[3]));
+          const drawn = behind.map((value, channel) => target.colour[channel] * alpha + value * (1 - alpha));
+          ratios.push(contrastRatio(drawn, behind));
+        }
+      }
+      ratios.sort((one, other) => one - other);
+      if (!ratios.length) continue;
+      const measured = ratios[Math.floor(ratios.length * 0.05)];
+      const needed = target.large ? 3 : 4.5;
+      if (measured < needed) {
+        findings.push({ key: `${target.shot}: ${target.label}`, measured,
+          message: `${target.shot}: ${target.label} over a photo has ${measured.toFixed(1)}:1 contrast, needs ${needed}:1 ` +
+            `(WCAG AA${target.large ? ", large text" : ""}); raise the photo's tint strength or move the text` });
+      }
+    }
+    return findings;
+  }
+
   function finish() {
     if (!SHOTS.length) throw new Error("no shots: call shot() for each shot before MT.finish()");
     SHOTS.sort((a, b) => a.s - b.s);
@@ -501,18 +740,20 @@
     chaptersDrawer();
     grainDrawer();
     window.MT_INFO = { width: W, height: H, fps: FPS, duration: D, frames: Math.round(D * FPS), shots: SHOTS.slice(),
-      edit: EDIT };
+      edit: EDIT, photos: PHOTOS.slice(), missingPhotos: [] };
     window.MT_READY = ready();
   }
 
   applyBrand();
 
   const MT = { tl, cue, addDrawer, rand, shot, slam, pop, rise, fadeIn, stagger, stamp, highlight, strike, shake, hit,
-    kenBurns, drift, punchIn, typer, counter, riser, down, sfx, bed, nocap, faceCam, stretchAt, checkEdit, renderAt, check, finish, SFX, SHOTS, NOCAP, W, H, FPS, D };
+    kenBurns, drift, punchIn, typer, counter, riser, down, sfx, bed, nocap, faceCam, photo, stretchAt, checkEdit, renderAt, check,
+    contrastTargets, contrastMeasure, contrastRatio, finish, SFX, SHOTS, NOCAP, PHOTOS, W, H, FPS, D };
   window.MT = MT;
   window.renderAt = renderAt;
   window.SFX = SFX;
   // Helpers as globals, so a composition reads like a shot list: shot(...); slam(...); hit(...)
   for (const k of ["tl", "cue", "addDrawer", "shot", "slam", "pop", "rise", "fadeIn", "stagger", "stamp", "highlight",
-    "strike", "shake", "hit", "kenBurns", "drift", "punchIn", "typer", "counter", "riser", "down", "sfx", "bed", "nocap", "faceCam"]) window[k] = MT[k];
+    "strike", "shake", "hit", "kenBurns", "drift", "punchIn", "typer", "counter", "riser", "down", "sfx", "bed", "nocap", "faceCam",
+    "photo"]) window[k] = MT[k];
 })();

@@ -64,11 +64,14 @@ async function openComposition(browser, html, { scale = 1 } = {}) {
   const errors = [];
   const warnings = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  const base = pathToFileURL(path.dirname(file)).href + "/";
+  // a missing photo in assets/ is reported by check (MT_INFO.missingPhotos), not as a page error
+  const isAsset = (url) => String(url || "").startsWith(base + "assets/");
   page.on("console", (m) => {
-    if (m.type() === "error") errors.push(m.text());
+    if (m.type() === "error" && !(isAsset(m.location()?.url) && /Failed to load resource/.test(m.text()))) errors.push(m.text());
     if (m.type() === "warning" && m.text().startsWith("[mytoma]")) warnings.push(m.text());
   });
-  page.on("requestfailed", (r) => errors.push(`failed to load ${r.url().replace(pathToFileURL(path.dirname(file)).href + "/", "")}`));
+  page.on("requestfailed", (r) => { if (!isAsset(r.url())) errors.push(`failed to load ${r.url().replace(base, "")}`); });
   await page.goto(pathToFileURL(file).href, { waitUntil: "load" });
   if (errors.length) throw new Error("PAGE ERROR\n  " + errors.join("\n  "));
   const ok = await page.evaluate(() => typeof window.renderAt === "function" && !!window.MT_READY);

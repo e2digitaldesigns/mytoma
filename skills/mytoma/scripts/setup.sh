@@ -24,14 +24,14 @@ if ! node -e 'const p=require("playwright-core").chromium.executablePath(); proc
     || echo "note: Chromium download failed; using a system Chrome if one is installed (set MYTOMA_CHROME to choose)"
 fi
 
-# Sound: Python 3.10+ with numpy and scipy (MYTOMA_PYTHON picks another interpreter, e.g. a venv's)
+# Sound, transcription and photos: Python 3.10+ with numpy, scipy, faster-whisper and Pillow (MYTOMA_PYTHON picks another interpreter, e.g. a venv's)
 PY="${MYTOMA_PYTHON:-python3}"
-if ! "$PY" -c 'import sys, numpy, scipy, faster_whisper; assert sys.version_info >= (3, 10)' 2>/dev/null; then
-  echo "installing numpy + scipy + faster-whisper for sound and transcription…"
-  "$PY" -m pip install --quiet numpy scipy faster-whisper 2>/dev/null \
-    || "$PY" -m pip install --quiet --user numpy scipy faster-whisper 2>/dev/null \
-    || echo "note: could not install numpy/scipy. On macOS/Homebrew use a venv:
-      python3 -m venv ~/.mytoma-venv && ~/.mytoma-venv/bin/pip install numpy scipy faster-whisper
+if ! "$PY" -c 'import sys, numpy, scipy, faster_whisper, PIL; assert sys.version_info >= (3, 10)' 2>/dev/null; then
+  echo "installing numpy + scipy + faster-whisper + pillow for sound, transcription and photos…"
+  "$PY" -m pip install --quiet numpy scipy faster-whisper pillow 2>/dev/null \
+    || "$PY" -m pip install --quiet --user numpy scipy faster-whisper pillow 2>/dev/null \
+    || echo "note: could not install numpy/scipy/pillow. On macOS/Homebrew use a venv:
+      python3 -m venv ~/.mytoma-venv && ~/.mytoma-venv/bin/pip install numpy scipy faster-whisper pillow
       export MYTOMA_PYTHON=~/.mytoma-venv/bin/python"
 fi
 

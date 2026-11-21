@@ -1,7 +1,7 @@
 # Third-party software and credits
 
 myToma is private (all rights reserved). It installs and uses the following, each under its own licence.
-None of them is committed to this repository; `setup.sh` installs them from npm.
+None of them is committed to this repository; `setup.sh` installs them from npm and pip.
 
 | Component | Use | Licence |
 |---|---|---|
@@ -13,7 +13,17 @@ None of them is committed to this repository; `setup.sh` installs them from npm.
 | [TopoJSON client](https://github.com/topojson/topojson-client) | decodes the world map | ISC |
 | [world-atlas](https://github.com/topojson/world-atlas) | country shapes, from [Natural Earth](https://www.naturalearthdata.com) (public domain) | ISC |
 | GSAP DrawSVG, MorphSVG and MotionPath plugins | line drawing, morphs, motion along paths | GreenSock Standard "no charge" licence (as GSAP) |
+| [Pillow](https://python-pillow.org) | verifies and re-encodes downloaded photos (find_media.py) | MIT-CMU (HPND) |
 | [FFmpeg](https://ffmpeg.org) | encoding (installed separately) | LGPL/GPL, depending on the build |
+
+## Photos in videos
+
+`find_media.py` downloads photos into a video's own folder, never into this repository. It keeps only openly
+licensed images (public domain, CC0, CC BY, CC BY-SA, the [Pexels licence](https://www.pexels.com/license/)) from
+[Wikimedia Commons](https://commons.wikimedia.org), [Openverse](https://openverse.org), the
+[Internet Archive](https://archive.org) and, with an API key, [Pexels](https://www.pexels.com), and writes each
+image's credit to the video's `credits.json` and `credits.txt` for its description. Shenghua's `find_media.py`
+showed which of these APIs to use; myToma's is written independently.
 
 ## Inspiration
 

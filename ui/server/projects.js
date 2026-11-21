@@ -116,9 +116,23 @@ export function projectState(id) {
       mixReport: readJSON(path.join(dir, "audio", "mix.json")),
     },
     faceFrames: fs.existsSync(faceDir) ? fs.readdirSync(faceDir).filter((f) => f.endsWith(".jpg")).length : 0,
+    // photos found with find_media.py: the files in assets/ and their credits (credits.txt is for the video's description)
+    images: images(dir),
+    credits: fs.existsSync(path.join(dir, "credits.txt")) && fs.statSync(path.join(dir, "credits.txt")).size > 1 ? "credits.txt" : null,
     outputs: outputs(dir),
     htmlMtime: mtime(path.join(dir, "index.html")),
   };
+}
+
+export function images(dir) {
+  const assets = path.join(dir, "assets");
+  if (!fs.existsSync(assets)) return [];
+  const credits = readJSON(path.join(dir, "credits.json"), []);
+  const byFile = new Map((Array.isArray(credits) ? credits : []).map((entry) => [entry.file, entry]));
+  return fs.readdirSync(assets).filter((file) => /\.(jpe?g|png|webp)$/i.test(file)).sort().map((file) => {
+    const credit = byFile.get(`assets/${file}`) || null;
+    return { file: `assets/${file}`, credit, mtime: mtime(path.join(assets, file)) };
+  });
 }
 
 export function defaultEdit() {
