@@ -38,7 +38,9 @@ out: ask for an SDR re-record) and variable frame rates (resampled to 30 fps, no
 **Proofread before anything else.** Misheard names and terms go in `<work>/fixes.json`
 (`{"Icon": "iCon", "that@12.40": "data", "um": ""}`: a plain key fixes every occurrence, `word@time`
 one word, `""` drops it). Words the video is about go in `<work>/keywords.json` (`["Claude",
-"spaghetti"]`): they stay in the accent colour once said. Then:
+"spaghetti"]`): they stay in the accent colour once said. The word being spoken sits on a pill: white text on
+the accent darkened 20% by default; set `BRAND.colors.capOn` (pill) and `capOnText` (text) to change it, and keep
+them at 4.5:1 contrast or more (WCAG AA): captions must stay readable. Then:
 
 ```bash
 python3 SKILL_DIR/scripts/captions.py <work>                       # words.js + captions.srt/.vtt

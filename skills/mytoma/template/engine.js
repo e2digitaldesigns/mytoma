@@ -226,6 +226,8 @@
     set("--brand-surface", c.surface);
     set("--brand-success", c.success);
     set("--brand-error", c.error);
+    set("--cap-on", c.capOn);           // caption pill behind the spoken word
+    set("--cap-on-text", c.capOnText);  // the spoken word's text on that pill
     root.setProperty("--W", W + "px");
     root.setProperty("--H", H + "px");
     document.documentElement.dataset.format = W > H ? "landscape" : W === H ? "square" : H / W > 1.5 ? "vertical" : "portrait";
