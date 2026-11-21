@@ -19,6 +19,7 @@ node cli.js stills ~/mytoma/demo 1.6,3.6,6.6,9.6  # stills + contact.jpg
 node cli.js sound ~/mytoma/demo --drop 9.3      # soundtrack from the timeline's cues → audio/mix.wav
 node cli.js render ~/mytoma/demo --draft        # fast preview (muxes the soundtrack)
 node cli.js render ~/mytoma/demo                # final: 2x supersampled, CRF 16, BT.709
+$MYTOMA_PYTHON find_media.py ~/mytoma/demo "potato chips" --count 3   # openly licensed photos → assets/, credits.txt
 npm test                                        # engine, sound and mixer tests
 python3 audio/library.py preview ~/reel.wav     # every sound in the library, to listen to
 ```
@@ -47,6 +48,10 @@ Built in steps, one pull request each:
 **myToma studio** (`ui/`): a browser editor around the skill, laid out like a desktop video editor. Upload or
 pick a take, run the pipeline, fix the transcript, mark graphics stretches and chapters, preview live, render.
 Runs directly or in Docker; see [ui/README.md](ui/README.md).
+
+**Photos**: `find_media.py` finds openly licensed photos (Wikimedia Commons, Openverse, Internet Archive, Pexels
+with a key) and writes the credits; `photo()` puts one behind a shot with a Ken Burns move and a brand tint, and
+`check` holds text over it to WCAG AA. The studio has a Find images tab.
 
 Done ahead of schedule: **infographics** (D3 + GSAP): bar, line, donut, map and timeline helpers.
 `node cli.js new ~/mytoma/charts --example infographics` starts from a demo of all five.

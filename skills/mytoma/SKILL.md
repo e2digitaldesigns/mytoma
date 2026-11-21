@@ -1,7 +1,7 @@
 ---
 name: mytoma
-description: "Build animated, brand-styled videos as HTML/GSAP compositions rendered frame by frame in headless Chromium, with a soundtrack built from the timeline's own sound cues, and encoded with ffmpeg. Use when asked to make or edit a video with myToma, animate a script or narration, or render a composition to mp4. Edits talking-head takes: local word-level transcription, trimmed dead air, word-timed captions, face shots at the open and close with animated shots between, the voice mixed with ducked music."
-compatibility: "Requires Node 18+, Python 3.10+ with numpy, scipy and faster-whisper, and ffmpeg on macOS or Linux (WSL on Windows). setup.sh installs GSAP, Playwright, fonts, Chromium and the Python packages; the first transcription downloads the speech model once."
+description: "Build animated, brand-styled videos as HTML/GSAP compositions rendered frame by frame in headless Chromium, with a soundtrack built from the timeline's own sound cues, and encoded with ffmpeg. Use when asked to make or edit a video with myToma, animate a script or narration, or render a composition to mp4. Edits talking-head takes: local word-level transcription, trimmed dead air, word-timed captions, face shots at the open and close with animated shots between, the voice mixed with ducked music. Finds openly licensed photos and keeps their credits."
+compatibility: "Requires Node 18+, Python 3.10+ with numpy, scipy, faster-whisper and Pillow, and ffmpeg on macOS or Linux (WSL on Windows). setup.sh installs GSAP, Playwright, fonts, Chromium and the Python packages; the first transcription downloads the speech model once."
 ---
 
 # myToma
@@ -106,6 +106,7 @@ Each shot is a `<section class="shot" id="sNN">`; times are seconds of the final
 | `counter(sel, from, to, s, e, opts)` | number counts up | tick |
 | `kenBurns` `drift` `punchIn` | slow camera moves on a held element | none |
 | `faceCam(img, a, b)` · `nocap(a, b)` | the speaker's frames for [a, b) (from `take.py face`) · no captions over [a, b) | none |
+| `photo(img, s, e, opts)` | a full-frame photo behind the shot's text: cover-cropped, slow Ken Burns move, brand tint (Photos, below) | none (add `sfx(s, "foley.shutter")`) |
 | `hit(t, power)` · `shake(t, power)` | impact on a beat | hit · none |
 | `riser(s, e)` · `down(s, e)` | sound only | riser · down |
 | `sfx(t, entry, opts)` | any library sound by id, e.g. `sfx(4.2, "impact.heavy")` | that entry |
@@ -113,6 +114,48 @@ Each shot is a `<section class="shot" id="sNN">`; times are seconds of the final
 
 Anything else: `tl.fromTo(...)` at a time, or `addDrawer(t => …)` for content drawn from `t` (canvas,
 Three.js, Lottie). Colours always come from `var(--brand-*)` tokens.
+
+### Photos
+
+Real photos make a story concrete: the dish, the place, the object, the period. Find them with:
+
+```bash
+$MYTOMA_PYTHON SKILL_DIR/scripts/find_media.py <work> "<query>" [--count 5] [--orientation portrait|landscape] \
+    [--min-width 1080] [--name fries]
+```
+
+It searches Wikimedia Commons, Openverse and the Internet Archive (and Pexels when `PEXELS_API_KEY` is set),
+keeps **openly licensed images only** (public domain, CC0, CC BY, CC BY-SA, the Pexels licence), skips the rest
+and says why (NC, ND, GFDL only, no licence, no author for an attribution licence), and saves the best into
+`<work>/assets/<name>-01.jpg`, `-02.jpg`, … with their credits in `<work>/credits.json` and `credits.txt`.
+`--search-only` lists candidates without downloading; `--add c2,c5` then fetches those. Old subjects (1800s
+places, engravings) are mostly on Commons: search the place's name, and lower `--min-width` for scans.
+
+- **When:** a line names something the viewer should see (a dish, a building, a historical scene). One photo
+  per idea, behind a shot that already says it; never photos as filler.
+- **Show the user the list and wait for their picks.** Delete the files they don't pick, then run
+  `find_media.py <work>` to bring the credits in line with assets/.
+- **Credits are required.** Every photo in the video has its entry in credits.json (`check` fails one that
+  doesn't), and credits.txt goes into the video's description: tell the user.
+- **Logos come from the brand** (the user's own files), never from a web search.
+- **Never photos of private people.** Public figures in their public role only; a result marked "identifiable
+  people" needs that judgement, and when unsure, leave it out.
+
+Place a photo as the first child of a shot, behind its text:
+
+```html
+<section class="shot" id="s03"><img id="p03" src="assets/moons-lake-house-01.jpg" alt=""> …the shot's text… </section>
+```
+```js
+photo("#p03", 8.6, 16.0, { move: "in", tint: "brand", strength: 0.6, mono: true });
+```
+
+`move`: `in` `out` `left` `right` `up` `down` `none` (a slow push or pan across [s, e), always covering the
+frame); `tint`: `brand` (the primary colour's hue, then darkened toward `--brand-bg`), `dark` (darkened only),
+`none`; `strength` 0-1 (default 0.55); `mono: true` for archival photos; `focus: "50% 30%"` keeps a subject in
+the crop. **Text over a photo must meet WCAG AA** (4.5:1; 3:1 for large type; captions always 4.5:1): `check`
+measures the pixels behind every word and fails what falls short. Fix it with a higher `strength` or by moving
+the text. `check` also fails a photo whose file is missing from assets/.
 
 ### Infographics
 
@@ -156,7 +199,8 @@ the cues changed since. **You cannot hear the result: say so and ask the user to
 ## 6. Check, look, render
 
 ```bash
-node SKILL_DIR/scripts/cli.js check  <work>                 # text off-frame or in the safe margin, empty shots, page errors
+node SKILL_DIR/scripts/cli.js check  <work>                 # text off-frame or in the safe margin, empty shots, page errors,
+                                                            # text over a photo below WCAG AA, photos missing or uncredited
 node SKILL_DIR/scripts/cli.js stills <work> 0.8,3.1,5.6     # no spaces; writes stills/ and contact.jpg
 node SKILL_DIR/scripts/cli.js render <work> --draft         # fast preview
 node SKILL_DIR/scripts/cli.js render <work>                 # final: 2x supersampled, lossless frames, CRF 16, BT.709
@@ -175,6 +219,8 @@ ffmpeg -v error -y -ss <t> -i <work>/out/<name>.mp4 -frames:v 1 -vf scale=360:-1
 - Every frame is a pure function of `t`: no `Math.random()` (use `MT.rand(key)`), no `Date.now()`, no
   CSS animations or transitions, no `<video>` or `.gif` elements, no `will-change` or 3D transforms.
 - Every helper that makes a sound pushes its cue; a plug-in that makes noise calls `sfx(t, entry)`.
+- Photos are openly licensed only (find_media.py), credited in credits.json/credits.txt, never of private
+  people; logos come from the brand. Text over a photo meets WCAG AA (`check` measures it).
 - Sounds in the library are redistributable only: `own`, `CC0` or `CC-BY` with credit
   (`library.py add … --licence`). Never add files from packs that forbid sharing them.
 - Colours come from `--brand-*` tokens, never hex values in shots.

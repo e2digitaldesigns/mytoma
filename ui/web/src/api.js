@@ -29,6 +29,8 @@ export const api = {
   setSource: (id, path) => call("POST", `/api/projects/${id}/source`, { path }),
   browse: (path) => call("GET", `/api/browse${path ? `?path=${encodeURIComponent(path)}` : ""}`),
   run: (id, step) => call("POST", `/api/projects/${id}/run/${step}`, {}),
+  searchImages: (id, search) => call("POST", `/api/projects/${id}/images/search`, search),
+  addImages: (id, ids, name) => call("POST", `/api/projects/${id}/images/add`, { ids, name }),
   jobs: () => call("GET", "/api/jobs"),
   job: (id) => call("GET", `/api/jobs/${id}`),
 };

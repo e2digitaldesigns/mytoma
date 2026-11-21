@@ -9,7 +9,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import express from "express";
 import { config } from "./config.js";
 import { STEPS, enqueue, events, getJob, listJobs, watchProject } from "./jobs.js";
@@ -154,6 +154,48 @@ app.put("/api/projects/:id/transcript", (req, res) => {
   const r = spawnSync(config.python, [path.join(config.skill, "scripts", "captions.py"), dir], { encoding: "utf8" });
   if (r.status !== 0) throw httpError(500, (r.stderr || r.stdout).trim());
   res.json({ ok: true, log: r.stdout.trim(), state: projectState(req.params.id) });
+});
+
+/* ---------- images: find_media.py searches openly licensed photos and keeps their credits ---------- */
+
+// Runs find_media.py with --json; it prints one JSON object on stdout (its notes go to stderr)
+function findMedia(dir, args) {
+  return new Promise((resolve, reject) => {
+    execFile(config.python, [path.join(config.skill, "scripts", "find_media.py"), dir, ...args, "--json"],
+      { encoding: "utf8", timeout: 180000, maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) => {
+        const last = String(stdout || "").trim().split("\n").pop();
+        let payload = null;
+        try { payload = JSON.parse(last); } catch { /* not json */ }
+        if (payload) return resolve({ ...payload, failed: !!error });
+        reject(httpError(500, (stderr || stdout || error?.message || "find_media.py failed").trim().split("\n").slice(-3).join(" ")));
+      });
+  });
+}
+
+app.post("/api/projects/:id/images/search", async (req, res, next) => {
+  try {
+    const dir = projectDir(req.params.id);
+    const query = String(req.body?.query || "").trim().slice(0, 200);
+    if (!query) throw httpError(400, "type what to search for");
+    const args = [query, "--search-only"];
+    if (["portrait", "landscape"].includes(req.body?.orientation)) args.push("--orientation", req.body.orientation);
+    const minWidth = Math.round(Number(req.body?.minWidth));
+    if (Number.isFinite(minWidth) && minWidth >= 0) args.push("--min-width", String(Math.min(minWidth, 8000)));
+    res.json(await findMedia(dir, args));
+  } catch (error) { next(error); }
+});
+
+app.post("/api/projects/:id/images/add", async (req, res, next) => {
+  try {
+    const dir = projectDir(req.params.id);
+    const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).map(String).filter((id) => /^c\d{1,4}$/.test(id));
+    if (!ids.length) throw httpError(400, "pick at least one image");
+    const args = ["--add", ids.join(",")];
+    const name = slugify(req.body?.name || "");
+    if (req.body?.name && name) args.push("--name", name);
+    const result = await findMedia(dir, args);
+    res.json({ ...result, state: projectState(req.params.id) });
+  } catch (error) { next(error); }
 });
 
 /* ---------- jobs ---------- */

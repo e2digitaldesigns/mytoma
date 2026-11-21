@@ -172,3 +172,14 @@ h3 { font-size: 13px; margin: 16px 0 8px; }
 .toast { position: fixed; left: 50%; top: 58px; transform: translateX(-50%); background: var(--panel-2); border: 1px solid var(--line);
   padding: 8px 14px; border-radius: 8px; z-index: 30; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
 .toast.bad { border-color: var(--bad); color: #fecdd3; }
+
+/* ---------- find images ---------- */
+.image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+.image-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 6px; text-align: left; min-width: 0; }
+.image-card.on { border-color: var(--accent); outline: 2px solid var(--accent); }
+.image-card img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 4px; background: var(--bg); }
+.image-card .clip, .image-list .small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.add-bar { position: sticky; bottom: 0; background: var(--panel); padding: 10px 0; margin-top: 8px; }
+.image-list { display: flex; flex-direction: column; gap: 8px; }
+.image-list img { width: 64px; height: 48px; object-fit: cover; border-radius: 4px; flex: none; }
+.image-list .grow { min-width: 0; }

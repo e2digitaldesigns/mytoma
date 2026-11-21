@@ -5,7 +5,8 @@
  *
  *   node cli.js new     <work> [--format vertical|landscape|square|portrait] [--duration 10] [--fps 30] [--force]
  *                              [--example infographics]   start from an example instead of the demo
- *   node cli.js check   <work>                       layout problems, page errors; exit 1 on findings
+ *   node cli.js check   <work>                       layout problems, page errors, text over a photo below WCAG AA,
+ *                                                    photos missing from assets/ or credits.json; exit 1 on findings
  *   node cli.js stills  <work> <t,t,t> [--scale 1]   one JPEG per time into <work>/stills/, plus contact.jpg
  *   node cli.js cues    <work>                       sound cues the timeline pushed → <work>/cues.json
  *   node cli.js sound   <work> [--music synth|none|<file>|<entry>] [--voice <file>] [--drop <t>] [--drums-from <t>]
@@ -133,8 +134,35 @@ function cmdNew(pos, opt) {
 
 /* ---------- check ---------- */
 
+// Photos placed with photo(): each file is in assets/ and has its credit in credits.json (find_media.py writes both)
+function photoIssues(dir, info) {
+  const issues = [];
+  const credits = (() => { try { return JSON.parse(fs.readFileSync(path.join(dir, "credits.json"), "utf8")); } catch { return []; } })();
+  const credited = new Set((Array.isArray(credits) ? credits : credits.images || []).map((entry) => path.normalize(entry.file || "")));
+  for (const photo of info.photos || []) {
+    const relative = path.normalize(photo.source || "");
+    const where = `${photo.selector} (${photo.start}-${photo.end}s)`;
+    if (!photo.source || !fs.existsSync(path.join(dir, relative)) || (info.missingPhotos || []).includes(photo.source)) {
+      issues.push(`${where}: photo ${photo.source || "(no src)"} is missing from assets/; find_media.py <work> "<query>" saves photos there`);
+    } else if (!relative.startsWith("assets" + path.sep)) {
+      issues.push(`${where}: photo ${photo.source} is outside assets/; keep photos in assets/ so credits.json covers them`);
+    } else if (!credited.has(relative)) {
+      issues.push(`${where}: photo ${photo.source} has no entry in credits.json (your own photo? add {"file": "${photo.source}", "author": "you", "licence": "own"})`);
+    }
+  }
+  return issues;
+}
+
+// Text over a photo must meet WCAG AA: the engine hides those glyphs, we screenshot what is behind them, it measures
+async function contrastIssues(page, time) {
+  const targets = await page.evaluate((t) => (window.MT.contrastTargets ? window.MT.contrastTargets(t) : []), time);
+  if (!targets.length) return [];
+  const screenshot = "data:image/png;base64," + (await page.screenshot({ type: "png" })).toString("base64");
+  return page.evaluate(([image, list]) => window.MT.contrastMeasure(image, list), [screenshot, targets]);
+}
+
 async function cmdCheck(pos) {
-  const { html } = workPaths(pos[0]);
+  const { dir, html } = workPaths(pos[0]);
   const browser = await launch();
   try {
     const { page, info, warnings } = await openComposition(browser, html);
@@ -143,12 +171,18 @@ async function cmdCheck(pos) {
     for (const s of late) {
       issues.push(`${s.id}: ${s.s >= info.duration ? "starts" : "ends"} at ${s[s.s >= info.duration ? "s" : "e"]}s, after the video ends (${info.duration}s); fix the shot or run: node cli.js new <work> --duration <seconds>`);
     }
+    issues.push(...photoIssues(dir, info));
+    const worstContrast = new Map();   // one line per text element: its worst sampled moment
     for (const s of info.shots.filter((x) => x.s < info.duration)) {
       for (const k of [0.25, 0.5, 0.85]) {
         const t = s.s + (s.e - s.s) * k;
         issues.push(...(await page.evaluate((t) => window.MT.check(t), t)));
+        for (const finding of await contrastIssues(page, t)) {
+          if (!worstContrast.has(finding.key) || finding.measured < worstContrast.get(finding.key).measured) worstContrast.set(finding.key, finding);
+        }
       }
     }
+    issues.push(...[...worstContrast.values()].map((finding) => finding.message));
     // projects made before stretches existed have an engine copy without checkEdit (`new` refreshes it)
     issues.push(...(await page.evaluate(() => (window.MT.checkEdit ? window.MT.checkEdit() : []))));
     const unique = [...new Set(issues.map((i) => i.replace(/ @[\d.]+s:/, ":")))];
@@ -161,6 +195,10 @@ async function cmdCheck(pos) {
       console.log(`clean · ${info.shots.length} shots · ${info.width}x${info.height} · ${info.duration}s\nNext: node cli.js stills ${pos[0]} <one time per shot>`);
     }
   } finally { await browser.close(); }
+}
+
+function refuseMissingPhotos(info) {
+  if (info.missingPhotos?.length) die(`Missing photos: ${info.missingPhotos.join(", ")}. Put them in assets/ (find_media.py), then run check.`);
 }
 
 /* ---------- stills + contact sheet ---------- */
@@ -176,7 +214,8 @@ async function cmdStills(pos, opt) {
   fs.mkdirSync(out, { recursive: true });
   const browser = await launch();
   try {
-    const { page } = await openComposition(browser, html, { scale });
+    const { page, info } = await openComposition(browser, html, { scale });
+    refuseMissingPhotos(info);
     const cdp = await page.context().newCDPSession(page);
     const index = [];
     for (const [i, t] of times.entries()) {
@@ -362,6 +401,7 @@ async function cmdRender(pos, opt) {
     const probe = await openComposition(browser, html, { scale: 1 });
     const info = probe.info;
     await probe.context.close();
+    refuseMissingPhotos(info);
     const per = Math.max(1, Math.round(chunkSec * info.fps));
     const chunks = [];
     for (let from = 0; from < info.frames; from += per) {
@@ -446,6 +486,8 @@ function cmdDoctor() {
   line(py.status === 0, `python ${String(py.stdout || "").trim()} + numpy + scipy (sound)`, `pip install numpy scipy  (Python 3.10+; or set MYTOMA_PYTHON)`);
   const fw = spawnSync(PYTHON, ["-c", "import faster_whisper; print(faster_whisper.__version__)"], { encoding: "utf8" });
   line(fw.status === 0, `faster-whisper ${String(fw.stdout || "").trim()} (transcription)`, "pip install faster-whisper");
+  const pillow = spawnSync(PYTHON, ["-c", "import PIL; print(PIL.__version__)"], { encoding: "utf8" });
+  line(pillow.status === 0, `pillow ${String(pillow.stdout || "").trim()} (find_media.py photos)`, "pip install pillow");
   const lib = path.join(SKILL_DIR, "sounds", "library.json");
   line(fs.existsSync(lib), "sound library", `python3 ${path.join("audio", "library.py")} build`);
   console.log(bad ? `${bad} problem(s)` : "ready");
