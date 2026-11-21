@@ -92,6 +92,19 @@ test("create a project, pick its recording by path, never outside the media fold
   assert.equal((await req("GET", `/api/browse?path=${encodeURIComponent(tmp)}`)).status, 403);
 });
 
+test("templates are labelled apart from example videos, and a template keeps its colours", async () => {
+  const cfg = await req("GET", "/api/config");
+  assert.equal(cfg.data.templates[0], "starter");
+  assert.equal(cfg.data.templateLabels["dark-truth"], "Dark Truth");
+  assert.equal(cfg.data.templateLabels["talking-head"], "Example: talking-head");
+  assert.ok(cfg.data.templates.indexOf("dark-truth") < cfg.data.templates.indexOf("talking-head"), "templates before examples");
+  const p = await req("POST", "/api/projects", { name: "Dark one", format: "vertical", template: "dark-truth" });
+  assert.equal(p.status, 201);
+  const html = fs.readFileSync(path.join(tmp, "projects", p.data.id, "index.html"), "utf8");
+  assert.match(html, /"name":"Dark Truth"/);
+  assert.match(html, /"width":1080,"height":1920/);
+});
+
 test("upload streams the file into the project", async () => {
   const bytes = fs.readFileSync(path.join(media, "take.mp4"));
   const r = await fetch(`${base}/api/projects/my-first-video/upload`, { method: "PUT", body: bytes, headers: { Cookie: cookie, "X-Filename": "phone take.mp4" } });

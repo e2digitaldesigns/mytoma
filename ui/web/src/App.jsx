@@ -83,7 +83,7 @@ function Home() {
           </label>
           <label className="field" style={{ marginBottom: 0 }}>Start from
             <select value={form.template} onChange={(e) => setForm({ ...form, template: e.target.value })}>
-              {(cfg?.templates || ["starter"]).map((t) => <option key={t} value={t}>{t === "starter" ? "Blank (starter)" : `Example: ${t}`}</option>)}
+              {(cfg?.templates || ["starter"]).map((t) => <option key={t} value={t}>{cfg?.templateLabels?.[t] || (t === "starter" ? "Blank (starter)" : `Example: ${t}`)}</option>)}
             </select>
           </label>
           <button className="primary" type="submit">Create</button>
