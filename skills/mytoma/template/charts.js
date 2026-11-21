@@ -56,7 +56,10 @@
     const o = Object.assign({ gap: 0.15, dur: 0.7, labelSize: 46, valueSize: 46, sort: false }, opts);
     const rows = o.sort ? data.slice().sort((a, b) => b.value - a.value) : data;
     const max = o.max ?? d3.max(rows, (d) => d.value);
-    const y = d3.scaleBand().domain(rows.map((d) => d.label)).range([0, h]).paddingInner(0.32);
+    // bars stay bar-shaped: with few rows, cap their thickness and centre the block
+    const maxBar = o.maxBar ?? 130;
+    const span = Math.min(h, rows.length * maxBar / 0.68);
+    const y = d3.scaleBand().domain(rows.map((d) => d.label)).range([(h - span) / 2, (h + span) / 2]).paddingInner(0.32);
     const labelW = o.labelWidth ?? Math.round(w * 0.3);
     const valueW = Math.round(w * 0.2);
     const x = d3.scaleLinear().domain([0, max]).range([0, w - labelW - valueW]);

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>myToma composition</title>
+<link rel="stylesheet" href="vendor/theme.css">
+<script>
+// BEGIN COMP — written by `cli.js new`; re-running it rewrites only this block
+window.COMP = {"width":1080,"height":1920,"fps":30,"duration":20.1,"seed":1};
+window.BRAND = {"name":"myToma","colors":{}};
+// END COMP
+</script>
+<script src="words.js"></script>  <!-- captions: captions.py writes it; new writes an empty one -->
+<script src="vendor/gsap.min.js"></script>
+<script src="vendor/engine.js"></script>
+<!-- infographics: barChart lineChart donut mapReveal timeline (charts.js) -->
+<script src="vendor/d3.min.js"></script>
+<script src="vendor/topojson-client.min.js"></script>
+<script src="vendor/DrawSVGPlugin.min.js"></script>
+<script src="vendor/MorphSVGPlugin.min.js"></script>
+<script src="vendor/MotionPathPlugin.min.js"></script>
+<script src="vendor/data/world-110m.js"></script>
+<script src="vendor/data/world-50m.js"></script>
+<script src="vendor/charts.js"></script>
+</head>
+<body>
+<div id="world">
+  <div id="cam">
+<!-- BEGIN SHOTS -->
+    <section class="shot bleed" id="s01">
+      <img class="face" id="face1" alt="">
+      <span class="tag" id="s01n" style="position:absolute;top:300px">iCon</span>
+    </section>
+
+    <section class="shot" id="s02">
+      <p class="kicker" id="s02k">on the couch</p>
+      <div class="terminal"><span class="prompt">$ </span><span id="s02cmd"></span></div>
+      <h1 class="xl" id="s02w">work</h1>
+      <span class="stamp" id="s02s">done</span>
+    </section>
+
+    <section class="shot" id="s03">
+      <h1 class="xl accent" id="s03a">chill</h1>
+      <p class="md" id="s03b">with the</p>
+      <span class="pill" id="s03p">AI agent</span>
+    </section>
+
+    <section class="shot" id="s04">
+      <p class="kicker" id="s04k">named</p>
+      <h1 class="xl accent" id="s04a" style="font-size:170px">Claude</h1>
+    </section>
+
+    <section class="shot" id="s05">
+      <p class="kicker" id="s05k">right now</p>
+      <h1 class="xl accent" id="s05n">0</h1>
+      <p class="md" id="s05p">people</p>
+    </section>
+
+    <section class="shot" id="s06" style="justify-content:flex-start;padding-top:300px">
+      <p class="kicker" id="s06k">right now · people eating</p>
+      <div class="chart" id="food" style="height:520px"></div>
+    </section>
+
+    <section class="shot bleed" id="s07">
+      <img class="face" id="face2" alt="">
+      <span class="tag" id="s07n" style="position:absolute;top:300px">iCon</span>
+    </section>
+<!-- END SHOTS -->
+  </div>
+  <canvas id="grain"></canvas>
+  <div id="vignette"></div>
+  <div id="flash"></div>
+</div>
+
+<script>
+// BEGIN TIMELINE — cut on the word times in transcript.txt
+// 01 face hook: "Hey, my name is iCon, and I'm sitting on the couch"
+shot("s01", 0, 3.5);
+faceCam("#face1", 0, 3.5);
+punchIn("#face1", 0, 3.5, 1.06);
+pop("#s01n", 1.78);
+
+// 02 "trying to get some work done"
+shot("s02", 3.5, 6.05, "whip");
+rise("#s02k", 3.55);
+typer("#s02cmd", "get_some_work_done()", 3.6, 4.7);
+slam("#s02w", 4.74, 0.8);
+stamp("#s02s", 4.88);
+nocap(4.7, 6.05);
+
+// 03 "and chilling with the AI agent"
+shot("s03", 6.05, 8.5, "zoom");
+slam("#s03a", 6.1, 0.6);
+rise("#s03b", 6.44);
+pop("#s03p", 7.04);
+nocap(6.05, 8.5);
+
+// 04 "named Claude."
+shot("s04", 8.5, 10.65, "whip");
+rise("#s04k", 8.5);
+slam("#s04a", 8.58, 1);
+nocap(8.5, 10.65);
+
+// 05 "And right now, there are 345 people"
+shot("s05", 10.65, 12.9, "slide");
+rise("#s05k", 11.03);
+counter("#s05n", 0, 345, 11.69, 12.55);
+rise("#s05p", 12.6);
+nocap(11.6, 12.9);
+
+// 06 "eating spaghetti and 321 people eating ice cream": each bar grows as its food is said
+shot("s06", 12.9, 19.25, "zoom");
+rise("#s06k", 13.0);
+barChart("#food", [{ label: "Spaghetti", value: 345 }, { label: "Ice cream", value: 321 }], 14.25,
+  { gap: 18.71 - 14.25, labelWidth: 330, dur: 0.8 });
+
+// 07 face close
+shot("s07", 19.25, 20.1, "fade");
+faceCam("#face2", 19.25, 20.1);
+pop("#s07n", 19.4);
+// END TIMELINE
+
+MT.finish();
+</script>
+</body>
+</html>
