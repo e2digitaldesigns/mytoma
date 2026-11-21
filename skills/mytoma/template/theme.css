@@ -141,7 +141,7 @@ html, body {
 /* the word being spoken: light text on a darkened accent pill. Default: white on the accent mixed 80/20 with black
    (#6f4ac5 for the default violet, 6.1:1, WCAG AA). Override with BRAND.colors.capOn / capOnText; keep 4.5:1. */
 .cap-line .w.on, .cap-line .w.key.on { background: var(--cap-on, color-mix(in srgb, var(--brand-primary) 80%, #000));
-  color: var(--cap-on-text, #fff); -webkit-text-stroke: 0; opacity: 1; }
+  color: var(--cap-on-text, #fff); -webkit-text-stroke: 0; text-shadow: none; opacity: 1; }
 
 /* ---------- face shots ---------- */
 
