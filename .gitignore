@@ -1,0 +1,15 @@
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
+
+# Downloaded on setup, never committed
+skills/mytoma/vendor/
+
+# Renders and work folders
+work/
+out/
+frames/
+*.mp4
+!docs/*.mp4
