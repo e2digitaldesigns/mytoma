@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>myToma · infographics example</title>
+<link rel="stylesheet" href="vendor/theme.css">
+<script>
+// BEGIN COMP — written by `cli.js new`; re-running it rewrites only this block
+window.COMP = {"width":1080,"height":1920,"fps":30,"duration":21,"seed":1};
+window.BRAND = {"name":"myToma","colors":{}};
+// END COMP
+</script>
+<script src="vendor/gsap.min.js"></script>
+<script src="vendor/engine.js"></script>
+<!-- infographics: barChart lineChart donut mapReveal timeline (charts.js) -->
+<script src="vendor/d3.min.js"></script>
+<script src="vendor/topojson-client.min.js"></script>
+<script src="vendor/DrawSVGPlugin.min.js"></script>
+<script src="vendor/MorphSVGPlugin.min.js"></script>
+<script src="vendor/MotionPathPlugin.min.js"></script>
+<script src="vendor/data/world-110m.js"></script>
+<script src="vendor/data/world-50m.js"></script>
+<script src="vendor/charts.js"></script>
+</head>
+<body>
+<div id="world">
+  <div id="cam">
+<!-- BEGIN SHOTS — every number here is SAMPLE DATA, for showing the helpers only -->
+    <section class="shot" id="s01">
+      <p class="kicker" id="s01k">infographics · sample data</p>
+      <h1 class="lg" id="s01t">views by <span class="accent">day</span></h1>
+      <div class="chart" id="bars" style="height:820px"></div>
+    </section>
+
+    <section class="shot" id="s02">
+      <p class="kicker">sample data</p>
+      <h1 class="lg" id="s02t">the <span class="accent">trend</span></h1>
+      <div class="chart" id="line" style="height:900px"></div>
+    </section>
+
+    <section class="shot" id="s03">
+      <p class="kicker">sample data</p>
+      <div class="chart" id="donut" style="width:760px;height:760px"></div>
+      <p class="md" id="s03c">said <span class="accent">yes</span></p>
+    </section>
+
+    <section class="shot" id="s04" style="padding:120px 40px">
+      <p class="kicker" id="s04k">paris → berlin</p>
+      <div class="chart" id="map" style="height:1400px"></div>
+    </section>
+
+    <section class="shot" id="s05">
+      <p class="kicker">sample dates</p>
+      <h1 class="lg" id="s05t">in <span class="accent">order</span></h1>
+      <div class="chart" id="years" style="height:1100px"></div>
+      <span class="stamp" id="s05s">sample</span>
+    </section>
+<!-- END SHOTS -->
+  </div>
+  <canvas id="grain"></canvas>
+  <div id="vignette"></div>
+  <div id="flash"></div>
+</div>
+
+<script>
+// BEGIN TIMELINE
+shot("s01", 0, 4.2);
+rise("#s01k", 0.1);
+slam("#s01t", 0.3, 0.7);
+barChart("#bars", [
+  { label: "Mon", value: 1200 }, { label: "Tue", value: 1850 }, { label: "Wed", value: 2400 },
+  { label: "Thu", value: 1600 }, { label: "Fri", value: 900 },
+], 0.9, { highlight: "Wed", gap: 0.22 });
+
+shot("s02", 4.2, 8.6, "whip");
+rise("#s02t", 4.3);
+lineChart("#line", [
+  { x: 2016, y: 12 }, { x: 2017, y: 15 }, { x: 2018, y: 14 }, { x: 2019, y: 19 }, { x: 2020, y: 41 },
+  { x: 2021, y: 33 }, { x: 2022, y: 29 }, { x: 2023, y: 36 }, { x: 2024, y: 44 }, { x: 2025, y: 52 },
+], 4.6, 7.8, { annotate: [{ x: 2020, text: "spike" }], suffix: "k" });
+
+shot("s03", 8.6, 11.8, "zoom");
+donut("#donut", [{ label: "yes", value: 62 }, { label: "no", value: 27 }, { label: "unsure", value: 11 }],
+  8.9, { center: "62%", seg: 0.5 });
+rise("#s03c", 10.2);
+
+shot("s04", 11.8, 16.6, "fade");
+fadeIn("#s04k", 11.9);
+mapReveal("#map", 11.9, {
+  borders: 1.4,
+  focus: { names: ["France", "Germany", "Poland", "Italy", "Spain", "United Kingdom"], at: 13.2, dur: 1.3 },
+  highlight: [{ name: "France", at: 14.3 }, { name: "Germany", at: 15.6 }],
+  pins: [{ at: 14.5, lonlat: [2.35, 48.86], text: "Paris" }, { at: 15.8, lonlat: [13.4, 52.52], text: "Berlin" }],
+  route: { points: [[2.35, 48.86], [13.4, 52.52]], at: 14.6, dur: 1.1 },
+});
+
+shot("s05", 16.6, 21, "slide");
+rise("#s05t", 16.7);
+timeline("#years", [
+  { date: "1905", text: "first sample event" }, { date: "1929", text: "second sample event" },
+  { date: "1962", text: "third sample event" }, { date: "1989", text: "fourth sample event" },
+], 17.0, { gap: 0.6 });
+stamp("#s05s", 20.0);
+// END TIMELINE
+
+MT.finish();
+</script>
+</body>
+</html>

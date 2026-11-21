@@ -9,6 +9,10 @@ None of them is committed to this repository; `setup.sh` installs them from npm.
 | [Playwright](https://playwright.dev) (`playwright-core`) | drives headless Chromium | Apache-2.0 |
 | [Archivo](https://github.com/Omnibus-Type/Archivo) via Fontsource | display and caption type | SIL Open Font License 1.1 |
 | [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) via Fontsource | monospace type | SIL Open Font License 1.1 |
+| [D3](https://d3js.org) | chart scales, shapes, map projections | ISC |
+| [TopoJSON client](https://github.com/topojson/topojson-client) | decodes the world map | ISC |
+| [world-atlas](https://github.com/topojson/world-atlas) | country shapes, from [Natural Earth](https://www.naturalearthdata.com) (public domain) | ISC |
+| GSAP DrawSVG, MorphSVG and MotionPath plugins | line drawing, morphs, motion along paths | GreenSock Standard "no charge" licence (as GSAP) |
 | [FFmpeg](https://ffmpeg.org) | encoding (installed separately) | LGPL/GPL, depending on the build |
 
 ## Inspiration

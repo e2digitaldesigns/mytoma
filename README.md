@@ -42,4 +42,7 @@ Built in steps, one pull request each:
 3. Talking-head workflow: transcription, trim, word-timed captions, face shots
 4. The skill layer: `SKILL.md`, block catalogue, worked example
 5. Claude app compatibility
-6. Generated voice, Three.js / Lottie / D3 blocks, content profiles
+6. Generated voice, Three.js / Lottie blocks, content profiles
+
+Done ahead of schedule: **infographics** (D3 + GSAP): bar, line, donut, map and timeline helpers.
+`node cli.js new ~/mytoma/charts --example infographics` starts from a demo of all five.

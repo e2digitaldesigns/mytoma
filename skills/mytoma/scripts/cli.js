@@ -4,6 +4,7 @@
  * myToma command line. Every command takes a work folder holding index.html (made by `new`).
  *
  *   node cli.js new     <work> [--format vertical|landscape|square|portrait] [--duration 10] [--fps 30] [--force]
+ *                              [--example infographics]   start from an example instead of the demo
  *   node cli.js check   <work>                       layout problems, page errors; exit 1 on findings
  *   node cli.js stills  <work> <t,t,t> [--scale 1]   one JPEG per time into <work>/stills/, plus contact.jpg
  *   node cli.js cues    <work>                       sound cues the timeline pushed → <work>/cues.json
@@ -69,16 +70,27 @@ const VENDOR_FILES = [
   [path.join(MODULES, "@fontsource-variable/archivo/files/archivo-latin-wdth-normal.woff2"), "fonts/archivo-wdth.woff2"],
   [path.join(MODULES, "@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2"), "fonts/jetbrains-mono-400.woff2"],
   [path.join(MODULES, "@fontsource/jetbrains-mono/files/jetbrains-mono-latin-700-normal.woff2"), "fonts/jetbrains-mono-700.woff2"],
+  // infographics
+  [path.join(TEMPLATE_DIR, "charts.js"), "charts.js"],
+  [path.join(MODULES, "d3/dist/d3.min.js"), "d3.min.js"],
+  [path.join(MODULES, "topojson-client/dist/topojson-client.min.js"), "topojson-client.min.js"],
+  [path.join(MODULES, "gsap/dist/DrawSVGPlugin.min.js"), "DrawSVGPlugin.min.js"],
+  [path.join(MODULES, "gsap/dist/MorphSVGPlugin.min.js"), "MorphSVGPlugin.min.js"],
+  [path.join(MODULES, "gsap/dist/MotionPathPlugin.min.js"), "MotionPathPlugin.min.js"],
+  // Natural Earth country shapes as scripts (file:// pages can't fetch JSON)
+  [path.join(MODULES, "world-atlas/countries-110m.json"), "data/world-110m.js", (buf) => "window.WORLD_110M=" + buf.toString().trim() + ";\n"],
+  [path.join(MODULES, "world-atlas/countries-50m.json"), "data/world-50m.js", (buf) => "window.WORLD_50M=" + buf.toString().trim() + ";\n"],
 ];
 
 // vendor/ holds copies, not links, so a work folder survives skill updates and moves between machines.
 function installVendor(dir) {
   const missing = VENDOR_FILES.filter(([src]) => !fs.existsSync(src));
   if (missing.length) die(`Missing ${missing.map(([s]) => path.relative(SKILL_DIR, s)).join(", ")}\nRun scripts/setup.sh first.`);
-  for (const [src, rel] of VENDOR_FILES) {
+  for (const [src, rel, transform] of VENDOR_FILES) {
     const dest = path.join(dir, "vendor", rel);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
-    fs.copyFileSync(src, dest);
+    if (transform) fs.writeFileSync(dest, transform(fs.readFileSync(src)));
+    else fs.copyFileSync(src, dest);
   }
 }
 
@@ -99,8 +111,10 @@ function cmdNew(pos, opt) {
     text = fs.readFileSync(html, "utf8").replace(/window\.COMP\s*=\s*\{.*?\};/s, block);
     console.log(`kept your shots and timeline; updated ${format} ${width}x${height}, ${comp.duration}s`);
   } else {
-    text = fs.readFileSync(path.join(TEMPLATE_DIR, "index.html"), "utf8").replace(/window\.COMP\s*=\s*\{.*?\};/s, block);
-    console.log(`new composition (demo shots) · ${format} ${width}x${height} · ${comp.duration}s @ ${fps} fps`);
+    const source = opt.example ? path.join(SKILL_DIR, "examples", String(opt.example), "index.html") : path.join(TEMPLATE_DIR, "index.html");
+    if (!fs.existsSync(source)) die(`No example "${opt.example}". Examples: ${fs.readdirSync(path.join(SKILL_DIR, "examples")).join(", ")}`);
+    text = fs.readFileSync(source, "utf8").replace(/window\.COMP\s*=\s*\{.*?\};/s, block);
+    console.log(`new composition (${opt.example ? opt.example + " example" : "demo shots"}) · ${format} ${width}x${height} · ${comp.duration}s @ ${fps} fps`);
   }
   fs.writeFileSync(html, text);
   installVendor(dir);

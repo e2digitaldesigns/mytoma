@@ -55,6 +55,27 @@ Each shot is a `<section class="shot" id="sNN">`; times are seconds of the final
 Anything else: `tl.fromTo(...)` at a time, or `addDrawer(t => …)` for content drawn from `t` (canvas,
 Three.js, Lottie). Colours always come from `var(--brand-*)` tokens.
 
+### Infographics
+
+Charts are D3-built SVG animated on the same timeline. Give each a container with a CSS size
+(`<div class="chart" id="bars" style="height:820px"></div>`); the graphic fills it.
+
+| Helper | Does | Sound cues |
+|---|---|---|
+| `barChart(sel, [{label, value}], t, {highlight, gap, prefix, suffix, decimals, sort})` | horizontal bars grow in turn, values count up | pop per bar |
+| `lineChart(sel, [{x, y}], s, e, {annotate: [{x, text}], suffix, min, max, ticks})` | line draws across [s, e), a dot rides the tip, annotations land as the tip reaches them | slow whoosh, pop per annotation |
+| `donut(sel, [{label, value}], s, {center: "62%", seg})` | segments sweep in turn, centre value counts up | pop per segment |
+| `mapReveal(sel, s, {borders, focus: {names, at, dur}, highlight: [{name, at}], route: {points, at, dur}, pins: [{lonlat, text, at}], detail, center})` | world borders draw on, the camera flies to the focus countries, countries light up, a great-circle route traces, pins drop | slow whooshes, soft impact per country, pops |
+| `timeline(sel, [{date, text}], s, {gap})` | an axis draws, each date types itself in and its label rises | typewriter per date |
+
+Country names are Natural Earth's (`"United States of America"`, `"United Kingdom"`); an unknown name
+fails loudly. Maps fill a tall frame's height (cover) and focus on each country's mainland; `detail:
+"50m"` gives finer borders for close zooms. Each helper returns the time it finishes. Start from
+`node cli.js new <work> --example infographics` to see all five.
+
+Never put invented numbers on screen as fact: data shown must come from the script or a cited source,
+and sample data says so on screen.
+
 ## 4. Sound
 
 Every helper above pushes its own cue; `SKILL_DIR/sounds/library.json` maps each cue type to a sound in
