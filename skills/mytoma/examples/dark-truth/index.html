@@ -5,7 +5,8 @@
 <title>Dark Truth</title>
 <link rel="stylesheet" href="vendor/theme.css">
 <style>
-/* Dark Truth: near-black, blood red, bone-white type, amber for evidence. Colours come from BRAND above. */
+/* Dark Truth: near-black, blood red, bone-white type, amber for evidence. Colours come from BRAND above.
+   Contrast on the #070707 background (WCAG AA needs 4.5:1 for small text): red #ec3344 4.9 · amber 9.0 · muted 5.7 · text 16.2. */
 #world { background:
   radial-gradient(ellipse 65% 40% at 50% 40%, color-mix(in srgb, var(--brand-primary) 16%, transparent), transparent 70%),
   var(--brand-bg); }
@@ -15,8 +16,11 @@
 .xl, .lg { font-stretch: 100%; letter-spacing: -.02em; }
 .stamp { color: var(--brand-primary); border-width: 6px; border-radius: 6px; transform: rotate(-4deg); }
 .card { border-radius: 10px; border-color: color-mix(in srgb, var(--brand-secondary) 30%, transparent); }
-.tag { background: var(--brand-primary); color: var(--brand-text); border-radius: 6px; }
+/* tags sit on the darker caption red: bone text on #9b1220 is 6.8:1 (bright red under small text fails AA) */
+.tag { background: var(--cap-on, #9b1220); color: var(--brand-text); border-radius: 6px; }
 .pill { background: color-mix(in srgb, var(--brand-secondary) 16%, transparent); color: var(--brand-secondary); }
+/* the placeholder's long words fit a 1080-wide frame */
+[data-format="vertical"] #s01 .lg, [data-format="square"] #s01 .lg, [data-format="portrait"] #s01 .lg { font-size: 84px; }
 /* redaction bar: black block over text */
 .redact { background: #000; color: transparent; padding: 0 .15em; display: inline-block; border-radius: 2px; }
 </style>
@@ -24,8 +28,8 @@
 // BEGIN COMP — written by `cli.js new`; re-running it rewrites only this block
 window.COMP = {"width":1080,"height":1920,"fps":30,"duration":10,"seed":1};
 window.BRAND = {"name":"Dark Truth","colors":{
-  "primary":"#e11d2e","secondary":"#d9a441","bg":"#070707","surface":"#151212","text":"#ece6dc","muted":"#8f877c",
-  "success":"#d9a441","error":"#e11d2e","capOn":"#9b1220","capOnText":"#ffffff"}};
+  "primary":"#ec3344","secondary":"#d9a441","bg":"#070707","surface":"#151212","text":"#ece6dc","muted":"#8f877c",
+  "success":"#d9a441","error":"#ec3344","capOn":"#9b1220","capOnText":"#ffffff"}};
 // END COMP
 </script>
 <script src="words.js"></script>

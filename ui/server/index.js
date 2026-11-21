@@ -45,11 +45,17 @@ app.use(["/api", "/files"], (req, res, next) => (authed(req) ? next() : res.stat
 app.get("/api/config", (req, res) => {
   const examples = fs.readdirSync(path.join(config.skill, "examples"))
     .filter((d) => fs.existsSync(path.join(config.skill, "examples", d, "index.html")));
+  // a folder with template.json is a starting look (it opens on a placeholder); the rest are finished demo videos
+  const meta = Object.fromEntries(examples.map((d) => [d, readJSON(path.join(config.skill, "examples", d, "template.json"), null)]));
+  const templates = examples.filter((d) => meta[d]?.kind === "template");
+  const templateLabels = Object.fromEntries([["starter", "Blank (starter)"],
+    ...examples.map((d) => [d, meta[d]?.kind === "template" ? (meta[d].label || d) : `Example: ${d}`])]);
   const lib = readJSON(path.join(config.skill, "sounds", "library.json"), { sounds: {} });
   const loops = Object.entries(lib.sounds).filter(([, e]) => e.kind === "loop").map(([id, e]) => ({ id, description: e.description }));
   res.json({
     formats: { vertical: [1080, 1920], landscape: [1920, 1080], square: [1080, 1080], portrait: [1080, 1350] },
-    templates: ["starter", ...examples.filter((e) => e !== "starter")],
+    templates: ["starter", ...templates, ...examples.filter((e) => e !== "starter" && !templates.includes(e))],
+    templateLabels,
     music: [{ id: "synth", description: "Synthesized bed, seeded per video" }, { id: "none", description: "No music" }, ...loops],
     media: config.media, projects: config.projects, steps: STEPS,
   });
