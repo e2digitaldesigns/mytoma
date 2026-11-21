@@ -110,6 +110,17 @@ class TakeTests(unittest.TestCase):
             self.assertAlmostEqual(got, src_frame % 32, delta=0.25, msg=f"edit frame {f} should be source frame {src_frame}")
         self.assertFalse((self.work / "face" / "f00015.jpg").exists(), "nothing outside the ranges")
 
+    def test_face_ranges_on_half_frames_round_like_the_engine(self):
+        # 1.15 s is frame 34.5: Math.round in faceCam() gives 35, Python's round() would give 34
+        src = self.dir / "take.mp4"
+        make_take(src)
+        sh(sys.executable, TAKE, "trim", src, self.work)
+        sh("node", CLI, "new", self.work, "--format", "square", "--duration", "4")
+        sh(sys.executable, TAKE, "face", self.work, "0.75-1.15")
+        frames = sorted(int(p.stem[1:]) for p in (self.work / "face").glob("f*.jpg"))
+        js = sh("node", "-e", "console.log(Math.round(0.75*30), Math.round(1.15*30) - 1)").split()
+        self.assertEqual([frames[0], frames[-1]], [int(x) for x in js])
+
     def test_face_rejects_ranges_past_the_take(self):
         src = self.dir / "take.mp4"
         make_take(src)
