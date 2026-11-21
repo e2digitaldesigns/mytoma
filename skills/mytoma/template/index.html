@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>myToma composition</title>
+<link rel="stylesheet" href="vendor/theme.css">
+<script>
+// BEGIN COMP — written by `cli.js new`; re-running it rewrites only this block
+window.COMP = {"width":1080,"height":1920,"fps":30,"duration":10,"seed":1};
+window.BRAND = {"name":"myToma","colors":{}};
+// END COMP
+</script>
+<script src="vendor/gsap.min.js"></script>
+<script src="vendor/engine.js"></script>
+</head>
+<body>
+<div id="world">
+  <div id="cam">
+<!-- BEGIN SHOTS -->
+    <section class="shot" id="s01">
+      <p class="kicker" id="s01k">step 1 · render engine</p>
+      <h1 class="xl" id="s01a">my<br><span class="accent">toma</span></h1>
+      <p class="md" id="s01b">voice in, picture out</p>
+    </section>
+
+    <section class="shot" id="s02">
+      <h1 class="lg" id="s02a">one</h1>
+      <h1 class="lg"><span class="hl pre" id="s02b">timeline</span></h1>
+      <p class="md" id="s02c">every shot runs on one clock</p>
+      <span class="stamp" id="s02s">paused</span>
+    </section>
+
+    <section class="shot" id="s03">
+      <div class="terminal"><span class="prompt">$ </span><span id="s03cmd"></span></div>
+      <h1 class="xl accent" id="s03n">0</h1>
+      <p class="kicker" id="s03k">frames rendered</p>
+      <div class="track"><div class="bar" id="s03bar"></div></div>
+    </section>
+
+    <section class="shot" id="s04">
+      <h1 class="lg word">seek</h1>
+      <h1 class="lg word">shoot</h1>
+      <h1 class="lg word accent">encode</h1>
+      <p class="md"><span class="strike" id="s04x">no screen recording</span></p>
+      <span class="pill" id="s04p">same frame, every time</span>
+    </section>
+<!-- END SHOTS -->
+  </div>
+  <canvas id="grain"></canvas>
+  <div id="vignette"></div>
+  <div id="flash"></div>
+</div>
+
+<script>
+// BEGIN TIMELINE — every time is in seconds of the final video
+shot("s01", 0, 2.4);
+rise("#s01k", 0.1);
+slam("#s01a", 0.5);
+rise("#s01b", 1.3);
+
+shot("s02", 2.4, 4.8, "whip");
+slam("#s02a", 2.55, 0.8);
+highlight("#s02b", 2.95);
+tl.set("#s02b", { color: "var(--brand-bg)" }, 3.1);
+rise("#s02c", 3.4);
+stamp("#s02s", 3.95);
+
+shot("s03", 4.8, 7.4, "zoom");
+typer("#s03cmd", "renderAt(t)", 4.95, 5.7);
+counter("#s03n", 0, 300, 5.6, 6.9);
+fadeIn("#s03k", 5.6);
+tl.fromTo("#s03bar", { scaleX: 0 }, { scaleX: 1, duration: 1.3, ease: "power2.out" }, 5.6);
+riser(6.4, 7.4);
+
+shot("s04", 7.4, 10, "slide");
+stagger("#s04 .word", 7.55, 0.28);
+rise("#s04x", 8.5);
+strike("#s04x", 8.85);
+pop("#s04p", 9.3);
+punchIn("#s04", 7.4, 10, 1.04);
+// END TIMELINE
+
+MT.finish();
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "mytoma",
+  "owner": { "name": "C. Bey", "url": "https://github.com/e2digitaldesigns" },
+  "metadata": {
+    "description": "Animated, brand-styled videos from HTML/GSAP compositions, rendered frame by frame.",
+    "version": "0.1.0",
+    "repository": "https://github.com/e2digitaldesigns/mytoma"
+  },
+  "plugins": [
+    { "name": "mytoma", "source": "./", "strict": true,
+      "description": "Animated, brand-styled videos from HTML/GSAP compositions, rendered frame by frame.",
+      "skills": ["./skills/mytoma"] }
+  ]
+}
