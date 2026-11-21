@@ -29,7 +29,7 @@ def commons_page(index, title, licence, artist, width=2400, height=1600, licence
                    "LicenseUrl": {"value": licence_url}, "Restrictions": {"value": restrictions}}
     return {"index": index, "title": f"File:{title}.jpg", "imageinfo": [{
         "url": f"https://upload.wikimedia.org/{title}.jpg",
-        "thumburl": f"https://upload.wikimedia.org/thumb/{title}.jpg/2560px-{title}.jpg",
+        "thumburl": f"https://upload.wikimedia.org/thumb/{title}.jpg/3840px-{title}.jpg",
         "descriptionurl": f"https://commons.wikimedia.org/wiki/File:{title}.jpg",
         "width": width, "height": height, "extmetadata": extmetadata}]}
 
@@ -198,6 +198,14 @@ class FindMediaTest(unittest.TestCase):
         self.assertEqual([path.name for path in (self.work / "assets").iterdir()], ["fries-01.jpg"])
         self.assertIn("landscape, not portrait", output)
         self.assertIn("Openverse \"Fries close-up\": landscape, not portrait", output)
+
+    def test_a_second_search_never_saves_the_same_photo_again(self):
+        self.run_tool("fries", "--count", "1", "--sources", "commons", "--name", "fries")
+        code, output = self.run_tool("thick fries", "--count", "1", "--sources", "commons", "--name", "chips")
+        self.assertEqual(code, 0, output)
+        self.assertIn("\"Thick fries\": already in this project's assets/", output)
+        sources = [entry["source_url"] for entry in json.loads((self.work / "credits.json").read_text())]
+        self.assertEqual(len(sources), len(set(sources)))
 
     def test_numbering_continues_and_credits_follow_the_files(self):
         self.run_tool("fries", "--count", "2")

@@ -13,7 +13,9 @@
         ones you did not pick)
 
 Sources: Wikimedia Commons, Openverse and the Internet Archive need no key; Pexels is searched only when
-PEXELS_API_KEY is set. Only openly licensed images are kept: public domain, CC0, CC BY, CC BY-SA and the
+PEXELS_API_KEY is set. Set MYTOMA_CONTACT (an email or URL) to put a contact in the User-Agent, as Wikimedia
+asks of automated clients; without one, Commons may answer bursts of downloads with "429 too many requests".
+Only openly licensed images are kept: public domain, CC0, CC BY, CC BY-SA and the
 Pexels licence. Anything else (NC, ND, GFDL only, no stated licence, an attribution licence with no
 author) is skipped, and the reason is printed.
 
@@ -29,6 +31,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -36,7 +39,9 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 
-USER_AGENT = "myToma/0.1 (find_media.py; image search for a private video tool)"
+# Wikimedia throttles clients whose User-Agent gives no contact; MYTOMA_CONTACT (your email or a URL) adds one
+USER_AGENT = "myToma/0.1 (find_media.py; image search for a private video tool" + (
+    f"; {os.environ['MYTOMA_CONTACT']})" if os.environ.get("MYTOMA_CONTACT") else ")")
 SOURCE_ORDER = ["pexels", "commons", "openverse", "archive"]
 SOURCE_NAMES = {"commons": "Wikimedia Commons", "openverse": "Openverse", "archive": "Internet Archive", "pexels": "Pexels"}
 LONGEST_SIDE = 3840                    # more than any frame needs, even a 2x supersampled landscape render
@@ -54,10 +59,19 @@ class SkipCandidate(Exception):
 
 # ---------- network: the one function tests replace ----------
 
-def fetch_url(url, headers=None):
+def fetch_url(url, headers=None, attempts=3):
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, **(headers or {})})
-    with urllib.request.urlopen(request, timeout=40) as response:
-        body = response.read(MAX_DOWNLOAD_BYTES + 1)
+    for attempt in range(attempts):
+        try:
+            with urllib.request.urlopen(request, timeout=40) as response:
+                body = response.read(MAX_DOWNLOAD_BYTES + 1)
+            break
+        except urllib.error.HTTPError as error:
+            # Wikimedia and Openverse answer bursts with 429: wait as asked (capped), then try again
+            if error.code != 429 or attempt == attempts - 1:
+                raise
+            wait = error.headers.get("Retry-After", "")
+            time.sleep(min(float(wait) if wait.replace(".", "", 1).isdigit() else 4.0 * (attempt + 1), 30.0))
     if len(body) > MAX_DOWNLOAD_BYTES:
         raise SkipCandidate(f"file is over {MAX_DOWNLOAD_BYTES // 1_000_000} MB")
     return body
@@ -125,7 +139,7 @@ def search_commons(query, limit, orientation):
     parameters = {
         "action": "query", "format": "json", "generator": "search", "gsrnamespace": "6", "gsrlimit": str(limit),
         "gsrsearch": f"{query} filetype:bitmap -filemime:image/gif", "prop": "imageinfo",
-        "iiprop": "url|size|mime|extmetadata", "iiurlwidth": "2560",
+        "iiprop": "url|size|mime|extmetadata", "iiurlwidth": "3840",
         "iiextmetadatafilter": "LicenseShortName|LicenseUrl|Artist|Attribution|ObjectName|Restrictions",
     }
     data = fetch_json("https://commons.wikimedia.org/w/api.php?" + urllib.parse.urlencode(parameters))
@@ -134,8 +148,10 @@ def search_commons(query, limit, orientation):
     for page in pages:
         info = (page.get("imageinfo") or [{}])[0]
         metadata = {key: plain_text(value.get("value")) for key, value in info.get("extmetadata", {}).items()}
+        # 3840 is one of Wikimedia's standard thumbnail widths (other widths are refused under load); a smaller
+        # original comes back as itself
         file_url = info.get("thumburl") or info.get("url")
-        thumb_url = re.sub(r"/\d+px-", "/480px-", file_url) if "/thumb/" in (file_url or "") else file_url
+        thumb_url = re.sub(r"/\d+px-", "/330px-", file_url) if "/thumb/" in (file_url or "") else file_url
         title = metadata.get("ObjectName") or re.sub(r"\.\w+$", "", page.get("title", "").removeprefix("File:"))
         results.append(candidate(
             "commons", title, metadata.get("Attribution") or metadata.get("Artist"),
@@ -237,8 +253,9 @@ def title_key(title):
     return re.sub(r"[^a-z0-9]+", " ", re.sub(r"\.\w{3,4}$", "", title.lower())).strip()
 
 
-def search(query, sources, count, min_width, orientation, log):
-    """Candidates that pass licence and size, interleaved across sources, and the ones skipped with why."""
+def search(query, sources, count, min_width, orientation, log, already=()):
+    """Candidates that pass licence and size, interleaved across sources, and the ones skipped with why.
+    `already`: source page URLs of images the project has (a second search never saves the same photo twice)."""
     per_source = {}
     for source in sources:
         if source == "pexels" and not os.environ.get("PEXELS_API_KEY"):
@@ -260,6 +277,9 @@ def search(query, sources, count, min_width, orientation, log):
                 continue
             seen_titles.add(key)
             seen_files.add(result["file_url"])
+            if result["page_url"] in already:
+                skipped.append((result, "already in this project's assets/"))
+                continue
             try:
                 result["licence"], result["licence_url"] = classify_licence(
                     result["licence_text"], result["licence_url_given"], result["author"])
@@ -481,7 +501,8 @@ def main(argv=None):
 
     if "pexels" in sources and not os.environ.get("PEXELS_API_KEY") and arguments.sources != ",".join(SOURCE_ORDER):
         log("Pexels skipped: PEXELS_API_KEY is not set (free key at https://www.pexels.com/api/)")
-    accepted, skipped = search(arguments.query, sources, arguments.count, arguments.min_width, arguments.orientation, log)
+    already = {entry.get("source_url") for entry in load_credits(work) if (work / entry["file"]).is_file()}
+    accepted, skipped = search(arguments.query, sources, arguments.count, arguments.min_width, arguments.orientation, log, already)
     save_search(work, arguments.query, accepted)
 
     if arguments.search_only:
