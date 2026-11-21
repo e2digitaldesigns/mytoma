@@ -1,0 +1,100 @@
+/* myToma base theme ("noir"): dark, clean, one accent. Every colour comes from a --brand-* token. */
+
+@font-face {
+  font-family: "Archivo";
+  src: url("fonts/archivo-wdth.woff2") format("woff2");
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-display: block;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("fonts/jetbrains-mono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: block;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("fonts/jetbrains-mono-700.woff2") format("woff2");
+  font-weight: 700;
+  font-display: block;
+}
+
+:root {
+  --brand-primary: #8b5cf6;
+  --brand-secondary: #22d3ee;
+  --brand-bg: #0b0b10;
+  --brand-surface: #16161f;
+  --brand-text: #f4f4f6;
+  --brand-muted: #8d8da0;
+  --brand-success: #34d399;
+  --brand-error: #f43f5e;
+  --display: "Archivo", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --grain: 0.06;
+  /* the renderer waits for these before the first frame */
+  --fonts-to-load: 900 100px "Archivo", 400 40px "JetBrains Mono", 700 40px "JetBrains Mono";
+}
+
+/* Nothing may run on the wall clock: CSS animations and transitions are off for good. */
+*, *::before, *::after { animation: none !important; transition: none !important; box-sizing: border-box; }
+
+html, body {
+  margin: 0; width: var(--W); height: var(--H); overflow: hidden;
+  background: var(--brand-bg); color: var(--brand-text);
+  font-family: var(--display); -webkit-font-smoothing: antialiased;
+}
+
+#world { position: absolute; inset: 0; overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 45% at 50% 38%, color-mix(in srgb, var(--brand-primary) 22%, transparent), transparent 70%),
+    var(--brand-bg); }
+/* no will-change anywhere: a composited layer keeps raster from earlier frames and breaks determinism */
+#cam { position: absolute; inset: 0; }
+
+.shot { position: absolute; inset: 0; visibility: hidden; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 36px; padding: 120px 90px; text-align: center; }
+
+/* overlays, above every shot */
+#flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; mix-blend-mode: screen; }
+#grain { position: absolute; inset: 0; width: 100%; height: 100%; opacity: var(--grain); mix-blend-mode: overlay; pointer-events: none; image-rendering: pixelated; }
+#vignette { position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 85% 75% at 50% 50%, transparent 55%, rgba(0,0,0,.55) 100%); }
+
+/* ---------- type ---------- */
+
+.xl { font-weight: 900; font-stretch: 125%; text-transform: uppercase; line-height: .9; letter-spacing: -.01em;
+  font-size: 200px; margin: 0; }
+.lg { font-weight: 900; font-stretch: 112%; text-transform: uppercase; line-height: .95; font-size: 120px; margin: 0; }
+.md { font-weight: 500; font-stretch: 100%; font-size: 56px; line-height: 1.2; margin: 0; color: var(--brand-muted); }
+.kicker { font-family: var(--mono); font-weight: 700; font-size: 34px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--brand-primary); margin: 0; }
+.accent { color: var(--brand-primary); }
+[data-format="landscape"] .xl { font-size: 170px; }
+[data-format="landscape"] .shot { padding: 90px 160px; }
+
+/* highlight box: highlight(sel, t) sweeps --hl from 0 to 1 */
+.hl { --hl: 0; display: inline-block; padding: 0 .12em; color: var(--brand-bg);
+  background: linear-gradient(var(--brand-primary), var(--brand-primary)) no-repeat left center / calc(var(--hl) * 100%) 100%; }
+.hl.pre { color: var(--brand-text); }
+
+/* strike-through: strike(sel, t) draws --strike from 0 to 1 */
+.strike { --strike: 0; position: relative; display: inline-block; }
+.strike::after { content: ""; position: absolute; left: -4%; top: 50%; height: .12em; width: calc(var(--strike) * 108%);
+  background: var(--brand-error); transform: translateY(-50%) rotate(-3deg); transform-origin: left center; }
+
+/* rubber stamp */
+.stamp { font-family: var(--mono); font-weight: 700; text-transform: uppercase; font-size: 64px; letter-spacing: .08em;
+  color: var(--brand-primary); border: 8px solid currentColor; border-radius: 14px; padding: 14px 34px; display: inline-block; }
+
+/* card, pill, terminal */
+.card { background: var(--brand-surface); border: 2px solid color-mix(in srgb, var(--brand-text) 10%, transparent);
+  border-radius: 36px; padding: 48px 56px; }
+.pill { font-family: var(--mono); font-weight: 700; font-size: 36px; padding: 12px 28px; border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-primary) 18%, transparent); color: var(--brand-primary); display: inline-block; }
+.terminal { font-family: var(--mono); font-size: 46px; text-align: left; width: 100%; background: #000;
+  border-radius: 28px; padding: 40px 48px; border: 2px solid color-mix(in srgb, var(--brand-text) 12%, transparent);
+  white-space: pre; overflow: hidden; }
+.terminal .prompt { color: var(--brand-primary); }
+.bar { height: 28px; border-radius: 14px; background: var(--brand-primary); transform-origin: left center; }
+.track { width: 100%; height: 28px; border-radius: 14px; background: var(--brand-surface); overflow: hidden; }

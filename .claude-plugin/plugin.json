@@ -1,0 +1,8 @@
+{
+  "name": "mytoma",
+  "description": "Animated, brand-styled videos from HTML/GSAP compositions, rendered frame by frame in headless Chromium and encoded with ffmpeg.",
+  "version": "0.1.0",
+  "author": { "name": "C. Bey", "url": "https://github.com/e2digitaldesigns" },
+  "repository": "https://github.com/e2digitaldesigns/mytoma",
+  "skills": ["./skills/mytoma"]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "mytoma-scripts",
+  "private": true,
+  "version": "0.1.0",
+  "description": "myToma render engine: HTML/GSAP compositions rendered frame by frame through headless Chromium into ffmpeg",
+  "type": "commonjs",
+  "bin": {
+    "mytoma": "cli.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "gsap": "3.15.1",
+    "playwright-core": "1.65.1",
+    "@fontsource-variable/archivo": "^5.2.0",
+    "@fontsource/jetbrains-mono": "^5.2.0"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "doctor": "node cli.js doctor"
+  }
+}
