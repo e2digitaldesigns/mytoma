@@ -274,6 +274,14 @@
     return false;
   }
 
+  // Opacity as seen: an element's own opacity times its ancestors' inside the shot. Before a slam starts, the
+  // slammed heading sits at opacity 0 and scale 2.2, and its child spans (own opacity 1) must not count as on screen.
+  function shownOpacity(el, root) {
+    let o = 1;
+    for (let n = el; n && n !== root.parentNode; n = n.parentNode) o *= Number(getComputedStyle(n).opacity);
+    return o;
+  }
+
   async function check(t) {
     await renderAt(t);
     const issues = [];
@@ -285,7 +293,7 @@
         Array.from(el.childNodes).some((n) => n.nodeType === 3 && n.textContent.trim()));
       for (const el of textEls) {
         const cs = getComputedStyle(el);
-        if (cs.visibility === "hidden" || Number(cs.opacity) < 0.05 || el.closest("[data-check=off]")) continue;
+        if (cs.visibility === "hidden" || shownOpacity(el, root) < 0.05 || el.closest("[data-check=off]")) continue;
         if (inMotion(el, root, t)) continue;   // mid-slam scale etc.: judge the layout it lands on, not the transient
         const r = el.getBoundingClientRect();
         if (!r.width || !r.height) continue;
