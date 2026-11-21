@@ -234,6 +234,8 @@
 
   /* ---------- render entry points ---------- */
 
+  // Returns t, or a promise of t when a drawer has to wait (an image decoding): the renderer awaits it
+  // before the screenshot, so a frame never shows the previous frame's image.
   function renderAt(t) {
     t = Math.max(0, Math.min(D, t));
     tl.seek(t, true);
@@ -241,8 +243,12 @@
       const el = document.getElementById(s.id);
       el.style.visibility = t >= s.s && t < s.e ? "visible" : "hidden";
     }
-    for (const fn of DRAWERS) fn(t);
-    return t;
+    const pending = [];
+    for (const fn of DRAWERS) {
+      const r = fn(t);
+      if (r && typeof r.then === "function") pending.push(r);
+    }
+    return pending.length ? Promise.all(pending).then(() => t) : t;
   }
 
   async function ready() {
@@ -251,15 +257,23 @@
     await Promise.all(loads);
     await document.fonts.ready;
     await Promise.all(Array.from(document.images).map((img) => (img.complete ? img.decode().catch(() => {}) : new Promise((r) => { img.onload = img.onerror = r; }).then(() => img.decode().catch(() => {})))));
-    const broken = Array.from(document.images).filter((img) => !img.naturalWidth).map((img) => img.getAttribute("src"));
+    const broken = Array.from(document.images).filter((img) => !img.dataset.frames && !img.naturalWidth).map((img) => img.getAttribute("src"));
     if (broken.length) throw new Error("images failed to load: " + broken.join(", "));
-    renderAt(0);
+    await renderAt(0);
     return true;
   }
 
   // Layout check for `cli.js check`: text outside the frame or the safe margin, shots that render nothing.
-  function check(t) {
-    renderAt(t);
+  // Is el (or an ancestor inside the shot) in the middle of a tween at t?
+  function inMotion(el, root, t) {
+    for (let n = el; n && n !== root.parentNode; n = n.parentNode) {
+      if (gsap.getTweensOf(n).some((tw) => { const s = tw.startTime(); return t >= s && t < s + tw.duration(); })) return true;
+    }
+    return false;
+  }
+
+  async function check(t) {
+    await renderAt(t);
     const issues = [];
     const margin = C.safe ?? Math.round(Math.min(W, H) * 0.04);
     const active = SHOTS.filter((s) => t >= s.s && t < s.e);
@@ -270,6 +284,7 @@
       for (const el of textEls) {
         const cs = getComputedStyle(el);
         if (cs.visibility === "hidden" || Number(cs.opacity) < 0.05 || el.closest("[data-check=off]")) continue;
+        if (inMotion(el, root, t)) continue;   // mid-slam scale etc.: judge the layout it lands on, not the transient
         const r = el.getBoundingClientRect();
         if (!r.width || !r.height) continue;
         const label = (el.id ? "#" + el.id : el.className ? "." + String(el.className).split(" ")[0] : el.tagName.toLowerCase()) + ` "${el.textContent.trim().slice(0, 24)}"`;
@@ -291,7 +306,89 @@
       if (cs.willChange !== "auto") issues.push(`${id}: will-change: ${cs.willChange} makes frames depend on seek order; remove it`);
       if (cs.transform.startsWith("matrix3d")) issues.push(`${id}: 3D transform (${cs.transform.slice(0, 24)}…) makes frames depend on seek order; use 2D transforms`);
     }
+    // captions: inside the frame, and not over the face in a face shot is the author's call (nocap)
+    const cap = document.getElementById("captions");
+    if (cap && cap.style.visibility !== "hidden" && cap.textContent.trim()) {
+      const r = cap.firstElementChild?.getBoundingClientRect();
+      if (r && (r.left < margin || r.right > W - margin)) issues.push(`captions @${t.toFixed(2)}s: "${cap.textContent.trim().slice(0, 30)}" is wider than the safe area (shorter phrases: captions.py --max-chars)`);
+    }
     return issues;
+  }
+
+  /* ---------- captions ---------- */
+
+  // nocap(a, b): no captions in [a, b), for shots where the words on screen already say the line
+  function nocap(a, b) { NOCAP.push([a, b]); }
+
+  // The caption layer reads window.CAPTIONS (words.js, from captions.py) and draws from t alone: the
+  // current phrase pops in, words light up as they are spoken, keywords keep the accent colour.
+  function captionsDrawer() {
+    const data = window.CAPTIONS;
+    if (!data || !data.phrases || !data.phrases.length) return;
+    let layer = document.getElementById("captions");
+    if (!layer) {
+      layer = document.createElement("div");
+      layer.id = "captions";
+      document.getElementById("world").insertBefore(layer, document.getElementById("flash"));
+    }
+    const line = document.createElement("div");
+    line.className = "cap-line";
+    layer.appendChild(line);
+    const P = data.phrases, Wd = data.words;
+    let shown = -1, spans = [];
+    const lead = 0.04, hold = 0.6;
+    addDrawer((t) => {
+      let idx = -1;
+      for (let i = 0; i < P.length; i++) {
+        const end = i + 1 < P.length ? Math.min(P[i + 1].s - lead, P[i].e + hold) : P[i].e + hold;
+        if (t >= P[i].s - lead && t < end) { idx = i; break; }
+      }
+      const hidden = idx < 0 || NOCAP.some(([a, b]) => t >= a && t < b);
+      layer.style.visibility = hidden ? "hidden" : "visible";
+      if (hidden) return;
+      if (idx !== shown) {                       // the phrase changed: rebuild its words (depends on idx only)
+        line.textContent = "";
+        spans = [];
+        for (let j = P[idx].a; j < P[idx].b; j++) {
+          const sp = document.createElement("span");
+          sp.className = "w" + (Wd[j].k ? " key" : "");
+          sp.textContent = Wd[j].w;
+          line.appendChild(sp);
+          line.appendChild(document.createTextNode(" "));
+          spans.push([sp, Wd[j], Wd[j + 1]]);
+        }
+        shown = idx;
+      }
+      const k = Math.max(0, Math.min(1, (t - P[idx].s + lead) / 0.14));
+      const pop = 0.82 + 0.18 * gsap.parseEase("back.out(2.2)")(k);
+      line.style.transform = `scale(${pop.toFixed(4)})`;
+      for (const [sp, w, nx] of spans) {
+        const on = t >= w.s && t < (nx && nx.s - w.e < 0.35 ? nx.s : w.e + 0.15);
+        sp.classList.toggle("said", t >= w.s);
+        sp.classList.toggle("on", on);
+      }
+    });
+  }
+
+  /* ---------- face shots ---------- */
+
+  // faceCam("#face", a, b): plays the speaker's frames for [a, b) into an <img>. The frames come from
+  // `take.py face <work> a-b`, use the same ranges. Each frame waits for its image to decode.
+  function faceCam(sel, a, b, opts = {}) {
+    const img = must(sel, "faceCam")[0];
+    if (img.tagName !== "IMG") throw new Error(`faceCam(): ${sel} must be an <img>`);
+    const dir = opts.dir || "face";
+    const f0 = Math.round(a * FPS), f1 = Math.round(b * FPS);
+    img.dataset.frames = `${f0}-${f1 - 1}`;
+    addDrawer((t) => {
+      if (t < a || t >= b) return;
+      const f = Math.min(f1 - 1, Math.max(f0, Math.round(t * FPS)));
+      if (img.dataset.f === String(f)) return;
+      img.dataset.f = String(f);
+      const src = `${dir}/f${String(f).padStart(5, "0")}.jpg`;
+      img.src = src;
+      return img.decode().catch(() => { throw new Error(`faceCam(): missing ${src}; run take.py face <work> ${a}-${b}`); });
+    });
   }
 
   function finish() {
@@ -301,6 +398,7 @@
       if (SHOTS[i].s < SHOTS[i - 1].e - 1e-6) console.warn(`[mytoma] ${SHOTS[i].id} starts before ${SHOTS[i - 1].id} ends (overlap is allowed, but check it is intended)`);
     }
     SFX.sort((a, b) => a.t - b.t);
+    captionsDrawer();
     grainDrawer();
     window.MT_INFO = { width: W, height: H, fps: FPS, duration: D, frames: Math.round(D * FPS), shots: SHOTS.slice() };
     window.MT_READY = ready();
@@ -309,11 +407,11 @@
   applyBrand();
 
   const MT = { tl, cue, addDrawer, rand, shot, slam, pop, rise, fadeIn, stagger, stamp, highlight, strike, shake, hit,
-    kenBurns, drift, punchIn, typer, counter, riser, down, sfx, bed, renderAt, check, finish, SFX, SHOTS, NOCAP, W, H, FPS, D };
+    kenBurns, drift, punchIn, typer, counter, riser, down, sfx, bed, nocap, faceCam, renderAt, check, finish, SFX, SHOTS, NOCAP, W, H, FPS, D };
   window.MT = MT;
   window.renderAt = renderAt;
   window.SFX = SFX;
   // Helpers as globals, so a composition reads like a shot list: shot(...); slam(...); hit(...)
   for (const k of ["tl", "cue", "addDrawer", "shot", "slam", "pop", "rise", "fadeIn", "stagger", "stamp", "highlight",
-    "strike", "shake", "hit", "kenBurns", "drift", "punchIn", "typer", "counter", "riser", "down", "sfx", "bed"]) window[k] = MT[k];
+    "strike", "shake", "hit", "kenBurns", "drift", "punchIn", "typer", "counter", "riser", "down", "sfx", "bed", "nocap", "faceCam"]) window[k] = MT[k];
 })();

@@ -118,6 +118,8 @@ function cmdNew(pos, opt) {
   }
   fs.writeFileSync(html, text);
   installVendor(dir);
+  const words = path.join(dir, "words.js");
+  if (!fs.existsSync(words)) fs.writeFileSync(words, "window.CAPTIONS = null;  // captions.py replaces this\n");
   console.log(`${html}\nNext: author shots between BEGIN/END SHOTS and BEGIN/END TIMELINE, then: node cli.js check ${pos[0]}`);
 }
 
@@ -428,6 +430,8 @@ function cmdDoctor() {
   line(fs.existsSync(path.join(MODULES, "gsap/dist/gsap.min.js")), "gsap + fonts (node_modules)", "run scripts/setup.sh");
   const py = spawnSync(PYTHON, ["-c", "import sys, numpy, scipy; assert sys.version_info >= (3, 10); print(sys.version.split()[0])"], { encoding: "utf8" });
   line(py.status === 0, `python ${String(py.stdout || "").trim()} + numpy + scipy (sound)`, `pip install numpy scipy  (Python 3.10+; or set MYTOMA_PYTHON)`);
+  const fw = spawnSync(PYTHON, ["-c", "import faster_whisper; print(faster_whisper.__version__)"], { encoding: "utf8" });
+  line(fw.status === 0, `faster-whisper ${String(fw.stdout || "").trim()} (transcription)`, "pip install faster-whisper");
   const lib = path.join(SKILL_DIR, "sounds", "library.json");
   line(fs.existsSync(lib), "sound library", `python3 ${path.join("audio", "library.py")} build`);
   console.log(bad ? `${bad} problem(s)` : "ready");

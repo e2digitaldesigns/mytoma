@@ -26,12 +26,12 @@ fi
 
 # Sound: Python 3.10+ with numpy and scipy (MYTOMA_PYTHON picks another interpreter, e.g. a venv's)
 PY="${MYTOMA_PYTHON:-python3}"
-if ! "$PY" -c 'import sys, numpy, scipy; assert sys.version_info >= (3, 10)' 2>/dev/null; then
-  echo "installing numpy + scipy for sound…"
-  "$PY" -m pip install --quiet numpy scipy 2>/dev/null \
-    || "$PY" -m pip install --quiet --user numpy scipy 2>/dev/null \
+if ! "$PY" -c 'import sys, numpy, scipy, faster_whisper; assert sys.version_info >= (3, 10)' 2>/dev/null; then
+  echo "installing numpy + scipy + faster-whisper for sound and transcription…"
+  "$PY" -m pip install --quiet numpy scipy faster-whisper 2>/dev/null \
+    || "$PY" -m pip install --quiet --user numpy scipy faster-whisper 2>/dev/null \
     || echo "note: could not install numpy/scipy. On macOS/Homebrew use a venv:
-      python3 -m venv ~/.mytoma-venv && ~/.mytoma-venv/bin/pip install numpy scipy
+      python3 -m venv ~/.mytoma-venv && ~/.mytoma-venv/bin/pip install numpy scipy faster-whisper
       export MYTOMA_PYTHON=~/.mytoma-venv/bin/python"
 fi
 
