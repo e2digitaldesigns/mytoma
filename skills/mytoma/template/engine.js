@@ -343,7 +343,8 @@
         const end = i + 1 < P.length ? Math.min(P[i + 1].s - lead, P[i].e + hold) : P[i].e + hold;
         if (t >= P[i].s - lead && t < end) { idx = i; break; }
       }
-      const hidden = idx < 0 || NOCAP.some(([a, b]) => t >= a && t < b);
+      const st = stretchAt(t);
+      const hidden = idx < 0 || NOCAP.some(([a, b]) => t >= a && t < b) || (st && st.subtitles === false);
       layer.style.visibility = hidden ? "hidden" : "visible";
       if (hidden) return;
       if (idx !== shown) {                       // the phrase changed: rebuild its words (depends on idx only)
@@ -368,6 +369,94 @@
         sp.classList.toggle("on", on);
       }
     });
+  }
+
+  /* ---------- edit marks (edit.js, written by the UI) ---------- */
+
+  // window.EDIT = {
+  //   stretches: [{a, b, level: "none" | "limited" | "full", subtitles: true}],
+  //   chapters: [{a, b, title}],
+  //   chapterStyle: {mode: "off" | "name" | "bar" | "both", position: "auto" | "top" | "bottom"}
+  // }
+  const EDIT = Object.assign({ stretches: [], chapters: [], chapterStyle: { mode: "both", position: "auto" } }, window.EDIT || {});
+  function stretchAt(t) { return EDIT.stretches.find((s) => t >= s.a && t < s.b) || null; }
+
+  // Chapters: the current chapter's name, a progress bar split into chapters, or both. Default placement
+  // keeps clear of each platform's buttons: top for vertical/square/portrait, bottom for landscape.
+  function chaptersDrawer() {
+    const ch = (EDIT.chapters || []).slice().sort((x, y) => x.a - y.a);
+    const style = Object.assign({ mode: "both", position: "auto" }, EDIT.chapterStyle || {});
+    if (!ch.length || style.mode === "off") return;
+    const pos = style.position === "auto" ? (W > H ? "bottom" : "top") : style.position;
+    const layer = document.createElement("div");
+    layer.id = "chapters";
+    layer.className = `ch-${pos}`;
+    const world = document.getElementById("world");
+    world.insertBefore(layer, document.getElementById("flash"));
+    if (pos === "bottom") document.documentElement.style.setProperty("--cap-top", W > H ? "70%" : "58%");
+    const name = document.createElement("div");
+    name.className = "ch-name";
+    const bar = document.createElement("div");
+    bar.className = "ch-bar";
+    const segs = ch.map((c) => {
+      const seg = document.createElement("div");
+      seg.className = "ch-seg";
+      seg.style.flex = `${Math.max(0.001, c.b - c.a)} 0 0`;
+      const fill = document.createElement("div");
+      fill.className = "ch-fill";
+      seg.appendChild(fill);
+      bar.appendChild(seg);
+      return { c, seg, fill };
+    });
+    if (style.mode === "name" || style.mode === "both") layer.appendChild(name);
+    if (style.mode === "bar" || style.mode === "both") layer.appendChild(bar);
+    let shown = null;
+    addDrawer((t) => {
+      const cur = ch.find((c) => t >= c.a && t < c.b) || null;
+      layer.style.visibility = cur ? "visible" : "hidden";
+      if (!cur) return;
+      if (shown !== cur) { name.textContent = cur.title; shown = cur; }
+      // the name eases in over 0.35 s each time a chapter starts
+      const k = Math.max(0, Math.min(1, (t - cur.a) / 0.35));
+      name.style.opacity = String(k);
+      name.style.transform = `translateY(${((1 - k) * (pos === "top" ? -16 : 16)).toFixed(2)}px)`;
+      for (const s of segs) {
+        const p = Math.max(0, Math.min(1, (t - s.c.a) / (s.c.b - s.c.a)));
+        s.fill.style.transform = `scaleX(${p.toFixed(4)})`;
+        s.seg.classList.toggle("on", s.c === cur);
+      }
+    });
+  }
+
+  // Does the authored timeline respect the marks? none = only the speaker's face (captions and chapters
+  // are separate layers); limited = the face stays on screen, light graphics allowed; full = anything.
+  async function checkEdit() {
+    const issues = [];
+    for (const st of EDIT.stretches || []) {
+      if (st.level === "full") continue;
+      const span = st.b - st.a;
+      let noFace = false;
+      const extras = new Set();
+      for (const k of [0.1, 0.5, 0.9]) {
+        const t = st.a + span * k;
+        await renderAt(t);
+        const live = SHOTS.filter((s) => t >= s.s && t < s.e).map((s) => document.getElementById(s.id));
+        const visible = (el) => { const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+          return r.width > 2 && r.height > 2 && cs.visibility !== "hidden" && Number(cs.opacity) > 0.05; };
+        const faces = live.flatMap((root) => Array.from(root.querySelectorAll("img[data-frames]"))).filter(visible);
+        if (!faces.length) noFace = true;
+        if (st.level === "none") {
+          live.flatMap((root) => Array.from(root.querySelectorAll("*")))
+            .filter((el) => !el.matches("img[data-frames]") && !el.querySelector("img[data-frames]") && visible(el))
+            .forEach((el) => extras.add(el.id ? "#" + el.id : String(el.className || el.tagName.toLowerCase()).split(" ")[0]));
+        }
+      }
+      // one line per problem per stretch
+      const label = `${st.level} stretch ${st.a.toFixed(2)}-${st.b.toFixed(2)}s`;
+      if (noFace) issues.push(`${label}: the speaker's face is not on screen (it must be, in a ${st.level} stretch)`);
+      if (extras.size) issues.push(`${label}: graphics on screen (${[...extras].slice(0, 5).join(", ")}); a none stretch shows only the face`);
+    }
+    return issues;
   }
 
   /* ---------- face shots ---------- */
@@ -399,15 +488,17 @@
     }
     SFX.sort((a, b) => a.t - b.t);
     captionsDrawer();
+    chaptersDrawer();
     grainDrawer();
-    window.MT_INFO = { width: W, height: H, fps: FPS, duration: D, frames: Math.round(D * FPS), shots: SHOTS.slice() };
+    window.MT_INFO = { width: W, height: H, fps: FPS, duration: D, frames: Math.round(D * FPS), shots: SHOTS.slice(),
+      edit: EDIT };
     window.MT_READY = ready();
   }
 
   applyBrand();
 
   const MT = { tl, cue, addDrawer, rand, shot, slam, pop, rise, fadeIn, stagger, stamp, highlight, strike, shake, hit,
-    kenBurns, drift, punchIn, typer, counter, riser, down, sfx, bed, nocap, faceCam, renderAt, check, finish, SFX, SHOTS, NOCAP, W, H, FPS, D };
+    kenBurns, drift, punchIn, typer, counter, riser, down, sfx, bed, nocap, faceCam, stretchAt, checkEdit, renderAt, check, finish, SFX, SHOTS, NOCAP, W, H, FPS, D };
   window.MT = MT;
   window.renderAt = renderAt;
   window.SFX = SFX;

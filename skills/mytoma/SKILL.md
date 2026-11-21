@@ -61,6 +61,18 @@ a name on it with `<span class="tag">`. Captions draw themselves from words.js; 
 over shots whose on-screen words already say the line. Mix with the voice:
 `cli.js sound <work> --voice <work>/voice.wav`.
 
+**The user's marks (`<work>/edit.json`, written by myToma studio) are rules, not suggestions:**
+
+- `stretches`: `{a, b, level, subtitles}`. **none**: only the speaker's face is on screen (a `faceCam`
+  shot, nothing else in it: no tag, no text). **limited**: the face stays on screen; light touches over it
+  are fine (a `.tag`, a number, a small chart in a corner). **full**: anything. `subtitles: false` hides the
+  captions there by itself; don't call `nocap` for it.
+- `chapters`: `{a, b, title}`, drawn by the engine with `chapterStyle` (name / bar / both, top / bottom).
+  Keep shot text clear of the chapter bar's edge of the frame.
+
+`check` fails any shot that breaks a mark. Read edit.json before writing the shot list, and say in the
+list which stretch each shot sits in.
+
 Show the user the shot list (time, line, what it shows) before authoring. Ask them to watch the
 result for lip sync and to listen to the mix: you can check neither by eye or ear.
 

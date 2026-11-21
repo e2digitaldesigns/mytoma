@@ -94,3 +94,51 @@ test("a missing face frame fails loudly", async () => {
   await context.close();
   fs.renameSync(path.join(work, "face", "gone.jpg"), path.join(work, "face", "f00020.jpg"));
 });
+
+test("chapters draw from edit.js, and a stretch can turn subtitles off", async () => {
+  const editFile = path.join(work, "edit.js");
+  fs.writeFileSync(editFile, `window.EDIT = ${JSON.stringify({
+    stretches: [{ a: 0, b: 0.5, level: "none", subtitles: true }, { a: 0.5, b: 0.9, level: "limited", subtitles: false }],
+    chapters: [{ a: 0, b: 1, title: "Intro" }, { a: 1, b: 2, title: "After" }],
+    chapterStyle: { mode: "both", position: "auto" },
+  })};\n`);
+  const { page, context } = await openComposition(browser, path.join(work, "index.html"));
+  const read = async (t) => {
+    await page.evaluate((t) => window.renderAt(t), t);
+    return page.evaluate(() => ({
+      pos: document.getElementById("chapters").className,
+      name: document.querySelector(".ch-name").textContent,
+      on: Array.from(document.querySelectorAll(".ch-seg")).findIndex((s) => s.classList.contains("on")),
+      caps: document.getElementById("captions").style.visibility !== "hidden",
+    }));
+  };
+  let s = await read(0.3);
+  assert.deepStrictEqual([s.pos, s.name, s.on, s.caps], ["ch-top", "Intro", 0, true], "square → chapters on top; captions on");
+  s = await read(0.75);
+  assert.strictEqual(s.caps, false, "subtitles: false hides captions in that stretch");
+  s = await read(1.2);
+  assert.deepStrictEqual([s.name, s.on], ["After", 1]);
+  await context.close();
+});
+
+test("check enforces the marks: none = only the face, limited = the face stays", async () => {
+  // 0-0.5 none over the face shot (clean); 1.0-2.0 limited over the text shot (no face: a finding)
+  fs.writeFileSync(path.join(work, "edit.js"), `window.EDIT = ${JSON.stringify({
+    stretches: [{ a: 0, b: 0.5, level: "none", subtitles: true }, { a: 1, b: 2, level: "limited", subtitles: true }], chapters: [],
+  })};\n`);
+  let out = "";
+  try { out = execFileSync("node", [CLI, "check", work], { encoding: "utf8" }); } catch (e) { out = e.stdout; }
+  assert.doesNotMatch(out, /none stretch 0\.00-0\.50s/, "the face shot alone satisfies a none stretch");
+  assert.match(out, /limited stretch 1\.00-2\.00s: the speaker's face is not on screen/);
+  // graphics inside a none stretch are flagged
+  fs.writeFileSync(path.join(work, "edit.js"), `window.EDIT = ${JSON.stringify({ stretches: [{ a: 1, b: 2, level: "none" }], chapters: [] })};\n`);
+  try { out = execFileSync("node", [CLI, "check", work], { encoding: "utf8" }); } catch (e) { out = e.stdout; }
+  assert.match(out, /none stretch 1\.00-2\.00s: graphics on screen/);
+  fs.writeFileSync(path.join(work, "edit.js"), "window.EDIT = null;\n");
+});
+
+test("re-running new keeps the composition's duration and format", () => {
+  execFileSync("node", [CLI, "new", work], { stdio: "ignore" });
+  const comp = JSON.parse(fs.readFileSync(path.join(work, "index.html"), "utf8").match(/window\.COMP\s*=\s*(\{.*?\});/s)[1]);
+  assert.deepStrictEqual([comp.width, comp.height, comp.duration], [1080, 1080, 2]);
+});

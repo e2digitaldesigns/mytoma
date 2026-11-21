@@ -1,0 +1,13 @@
+# Adds the Nvidia GPU (needs the NVIDIA Container Toolkit; on Windows, Docker Desktop with the WSL2 backend)
+services:
+  studio:
+    build:
+      args:
+        GPU: "1"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

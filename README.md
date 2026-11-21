@@ -39,10 +39,14 @@ Built in steps, one pull request each:
 
 1. Render engine: template, `renderAt(t)`, helpers, Playwright → ffmpeg ✅
 2. Sound: cue extraction, bundled sound library, mix ✅
-3. Talking-head workflow: transcription, trim, word-timed captions, face shots
+3. Talking-head workflow: transcription, trim, word-timed captions, face shots ✅
 4. The skill layer: `SKILL.md`, block catalogue, worked example
 5. Claude app compatibility
 6. Generated voice, Three.js / Lottie blocks, content profiles
+
+**myToma studio** (`ui/`): a browser editor around the skill, laid out like a desktop video editor. Upload or
+pick a take, run the pipeline, fix the transcript, mark graphics stretches and chapters, preview live, render.
+Runs directly or in Docker; see [ui/README.md](ui/README.md).
 
 Done ahead of schedule: **infographics** (D3 + GSAP): bar, line, donut, map and timeline helpers.
 `node cli.js new ~/mytoma/charts --example infographics` starts from a demo of all five.
