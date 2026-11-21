@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dark Truth</title>
+<link rel="stylesheet" href="vendor/theme.css">
+<style>
+/* Dark Truth: near-black, blood red, bone-white type, amber for evidence. Colours come from BRAND above. */
+#world { background:
+  radial-gradient(ellipse 65% 40% at 50% 40%, color-mix(in srgb, var(--brand-primary) 16%, transparent), transparent 70%),
+  var(--brand-bg); }
+#vignette { background: radial-gradient(ellipse 80% 70% at 50% 50%, transparent 45%, rgba(0,0,0,.75) 100%); }
+.kicker { color: var(--brand-primary); letter-spacing: .24em; }
+.kicker.evidence { color: var(--brand-secondary); }
+.xl, .lg { font-stretch: 100%; letter-spacing: -.02em; }
+.stamp { color: var(--brand-primary); border-width: 6px; border-radius: 6px; transform: rotate(-4deg); }
+.card { border-radius: 10px; border-color: color-mix(in srgb, var(--brand-secondary) 30%, transparent); }
+.tag { background: var(--brand-primary); color: var(--brand-text); border-radius: 6px; }
+.pill { background: color-mix(in srgb, var(--brand-secondary) 16%, transparent); color: var(--brand-secondary); }
+/* redaction bar: black block over text */
+.redact { background: #000; color: transparent; padding: 0 .15em; display: inline-block; border-radius: 2px; }
+</style>
+<script>
+// BEGIN COMP — written by `cli.js new`; re-running it rewrites only this block
+window.COMP = {"width":1080,"height":1920,"fps":30,"duration":10,"seed":1};
+window.BRAND = {"name":"Dark Truth","colors":{
+  "primary":"#e11d2e","secondary":"#d9a441","bg":"#070707","surface":"#151212","text":"#ece6dc","muted":"#8f877c",
+  "success":"#d9a441","error":"#e11d2e","capOn":"#9b1220","capOnText":"#ffffff"}};
+// END COMP
+</script>
+<script src="words.js"></script>
+<script src="edit.js"></script>  <!-- stretches and chapters: the UI writes it; new writes an empty one -->  <!-- captions: captions.py writes it; new writes an empty one -->
+<script src="vendor/gsap.min.js"></script>
+<script src="vendor/engine.js"></script>
+<!-- infographics: barChart lineChart donut mapReveal timeline (charts.js) -->
+<script src="vendor/d3.min.js"></script>
+<script src="vendor/topojson-client.min.js"></script>
+<script src="vendor/DrawSVGPlugin.min.js"></script>
+<script src="vendor/MorphSVGPlugin.min.js"></script>
+<script src="vendor/MotionPathPlugin.min.js"></script>
+<script src="vendor/data/world-110m.js"></script>
+<script src="vendor/data/world-50m.js"></script>
+<script src="vendor/charts.js"></script>
+</head>
+<body>
+<div id="world">
+  <div id="cam">
+<!-- BEGIN SHOTS -->
+    <!-- a placeholder until the shots are authored: the studio starts every project from this -->
+    <section class="shot" id="s01">
+      <p class="kicker">Dark Truth</p>
+      <h1 class="lg">uncomfortable questions. <span class="accent">unfiltered facts.</span></h1>
+      <p class="md">transcribe the recording, mark stretches and chapters, then ask Claude to plan this video</p>
+    </section>
+<!-- END SHOTS -->
+  </div>
+  <canvas id="grain"></canvas>
+  <div id="vignette"></div>
+  <div id="flash"></div>
+</div>
+
+<script>
+// BEGIN TIMELINE
+shot("s01", 0, MT.D);
+// END TIMELINE
+
+MT.finish();
+</script>
+</body>
+</html>
