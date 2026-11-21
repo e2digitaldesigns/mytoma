@@ -1,7 +1,7 @@
 ---
 name: mytoma
-description: "Build animated, brand-styled videos as HTML/GSAP compositions rendered frame by frame in headless Chromium and encoded with ffmpeg. Use when asked to make or edit a video with myToma, animate a script or narration, or render a composition to mp4. (Step 1 of the build: the render engine. Talking-head editing, captions, sound and the full workflow arrive in later steps.)"
-compatibility: "Requires Node 18+ and ffmpeg on macOS or Linux (WSL on Windows). setup.sh installs GSAP, Playwright, fonts and Chromium."
+description: "Build animated, brand-styled videos as HTML/GSAP compositions rendered frame by frame in headless Chromium, with a soundtrack built from the timeline's own sound cues, and encoded with ffmpeg. Use when asked to make or edit a video with myToma, animate a script or narration, or render a composition to mp4. (Steps 1–2 of the build: render engine and sound. Talking-head editing, captions and the full workflow arrive in later steps.)"
+compatibility: "Requires Node 18+, Python 3.10+ with numpy and scipy, and ffmpeg on macOS or Linux (WSL on Windows). setup.sh installs GSAP, Playwright, fonts, Chromium and the Python packages."
 ---
 
 # myToma
@@ -49,18 +49,37 @@ Each shot is a `<section class="shot" id="sNN">`; times are seconds of the final
 | `kenBurns` `drift` `punchIn` | slow camera moves on a held element | none |
 | `hit(t, power)` · `shake(t, power)` | impact on a beat | hit · none |
 | `riser(s, e)` · `down(s, e)` | sound only | riser · down |
+| `sfx(t, entry, opts)` | any library sound by id, e.g. `sfx(4.2, "impact.heavy")` | that entry |
+| `bed(s, e, entry)` | a loop across [s, e), e.g. `bed(0, 12, "texture.projector")` | that loop |
 
 Anything else: `tl.fromTo(...)` at a time, or `addDrawer(t => …)` for content drawn from `t` (canvas,
 Three.js, Lottie). Colours always come from `var(--brand-*)` tokens.
 
-## 4. Check, look, render
+## 4. Sound
+
+Every helper above pushes its own cue; `SKILL_DIR/sounds/library.json` maps each cue type to a sound in
+the bundled library (`python3 SKILL_DIR/scripts/audio/library.py list` shows them with tags). Pick
+entries by mood: `impact.heavy` for a reveal or a dark turn, `foley.typewriter` for archival dates and
+names, `foley.shutter` when a photo lands, `texture.projector` / `texture.crackle` under old footage,
+`bed.drone` / `bed.heartbeat` under tension. One heavy impact per video, at most two.
+
+```bash
+node SKILL_DIR/scripts/cli.js sound <work> [--music synth|none|<file>|bed.drone] [--voice <file>] \
+     [--drop <time of the final hit>] [--map hit=impact.heavy,type=foley.typewriter]
+```
+
+Writes `<work>/audio/mix.wav` at -14 LUFS / -2 dBTP: voice, a music bed ducked under it (it swells back
+in pauses), and every cue placed. `--drop` clears the music for the half second before the final hit.
+Unknown cues are listed, not fatal. `render` muxes the mix, and re-runs it with the same options if
+the cues changed since. **You cannot hear the result: say so and ask the user to listen.**
+
+## 5. Check, look, render
 
 ```bash
 node SKILL_DIR/scripts/cli.js check  <work>                 # text off-frame or in the safe margin, empty shots, page errors
 node SKILL_DIR/scripts/cli.js stills <work> 0.8,3.1,5.6     # no spaces; writes stills/ and contact.jpg
 node SKILL_DIR/scripts/cli.js render <work> --draft         # fast preview
 node SKILL_DIR/scripts/cli.js render <work>                 # final: 2x supersampled, lossless frames, CRF 16, BT.709
-node SKILL_DIR/scripts/cli.js cues   <work>                 # the sound cues the timeline pushed → cues.json
 ```
 
 Fix every `check` finding and look at `contact.jpg` before a final render. A killed render resumes from
@@ -75,6 +94,8 @@ ffmpeg -v error -y -ss <t> -i <work>/out/<name>.mp4 -frames:v 1 -vf scale=360:-1
 
 - Every frame is a pure function of `t`: no `Math.random()` (use `MT.rand(key)`), no `Date.now()`, no
   CSS animations or transitions, no `<video>` or `.gif` elements, no `will-change` or 3D transforms.
-- Every helper that makes a sound pushes its cue; a plug-in that makes noise calls `cue(t, type)`.
+- Every helper that makes a sound pushes its cue; a plug-in that makes noise calls `sfx(t, entry)`.
+- Sounds in the library are redistributable only: `own`, `CC0` or `CC-BY` with credit
+  (`library.py add … --licence`). Never add files from packs that forbid sharing them.
 - Colours come from `--brand-*` tokens, never hex values in shots.
 - `check` is clean and the contact sheet has been looked at before a final render.

@@ -36,6 +36,14 @@ const ARGS = [
   "--disable-background-timer-throttling",
   "--disable-renderer-backgrounding",
   "--mute-audio",
+  // a renderer has no business on the network: no sign-in, sync, updates or field trials
+  "--disable-background-networking",
+  "--disable-component-update",
+  "--disable-sync",
+  "--disable-default-apps",
+  "--no-first-run",
+  "--no-default-browser-check",
+  "--disable-features=OptimizationHints,MediaRouter,Translate",
 ];
 
 async function launch() {
