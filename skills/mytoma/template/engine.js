@@ -582,6 +582,35 @@
     return first.left < second.right && second.left < first.right && first.top < second.bottom && second.top < first.bottom;
   }
 
+  // The element's four corners on screen, transforms included (a stamp is rotated: its bounding box is not its shape).
+  // Inline elements cannot be transformed, so their box is their shape.
+  function cornerQuad(element, style) {
+    if (style.display === "inline") return null;
+    const previous = element.style.position;
+    if (style.position === "static") element.style.position = "relative";
+    const corners = [[0, 0], [1, 0], [1, 1], [0, 1]].map(([across, down]) => {
+      const marker = document.createElement("i");
+      marker.style.cssText = `position:absolute;left:${across * 100}%;top:${down * 100}%;width:0;height:0;margin:0;padding:0;border:0`;
+      element.appendChild(marker);
+      const point = marker.getBoundingClientRect();
+      marker.remove();
+      return [point.left, point.top];
+    });
+    element.style.position = previous;
+    return corners;
+  }
+  function insideQuad(quad, horizontal, vertical) {
+    let sign = 0;
+    for (let index = 0; index < 4; index++) {
+      const [startX, startY] = quad[index], [endX, endY] = quad[(index + 1) % 4];
+      const cross = (endX - startX) * (vertical - startY) - (endY - startY) * (horizontal - startX);
+      if (Math.abs(cross) < 1e-9) continue;
+      if (sign && Math.sign(cross) !== sign) return false;
+      sign = Math.sign(cross);
+    }
+    return true;
+  }
+
   let contrastHidden = [];
   // Step 1, after renderAt(t): the text drawn over a visible photo. Their glyphs stay hidden until contrastMeasure(),
   // so the renderer can screenshot exactly what is behind them.
@@ -601,7 +630,21 @@
       if (style.visibility === "hidden" || element.closest("[data-check=off]")) return;
       const opacity = opacityInside(element, root);
       if (opacity < 0.05) return;
-      const box = element.getBoundingClientRect();
+      // mid-entry (a pop, a rise, a slam) the text and its card are half drawn: judge the frame it settles on
+      if (!caption && inMotion(element, root, time)) return;
+      let box = element.getBoundingClientRect();
+      if (style.display === "inline") {
+        // an inline box can hang past its line (font ascent and descent vs line-height); its glyphs stay inside the block
+        let block = element.parentElement;
+        while (block && block !== root && getComputedStyle(block).display === "inline") block = block.parentElement;
+        if (block) {
+          const outer = block.getBoundingClientRect();
+          const left = Math.max(box.left, outer.left), top = Math.max(box.top, outer.top);
+          box = { left, top, width: Math.min(box.right, outer.right) - left, height: Math.min(box.bottom, outer.bottom) - top };
+          box.right = box.left + box.width;
+          box.bottom = box.top + box.height;
+        }
+      }
       if (box.width < 2 || box.height < 2 || !photoBoxes.some((photoBox) => overlaps(box, photoBox))) return;
       const fontSize = parseFloat(style.fontSize), bold = Number(style.fontWeight) >= 700;
       const large = !caption && (fontSize >= largeSize || (bold && fontSize >= largeBoldSize));
@@ -611,8 +654,8 @@
       const colour = parseColour(style.color);
       colour[3] *= opacity;
       targets.push({ label: caption ? `captions ${text}` : `${name} ${text}`, shot: caption ? "captions" : root.id, large, colour, stroke,
-        box: { left: box.left, top: box.top, width: box.width, height: box.height } });
-      element.dataset.mtHideGlyphs = "";
+        box: { left: box.left, top: box.top, width: box.width, height: box.height }, quad: cornerQuad(element, style) });
+      // hidden only after every colour is read: hiding a heading also hides its child spans' colour
       contrastHidden.push(element);
     };
     for (const root of liveShots) {
@@ -624,12 +667,13 @@
     if (captions && captions.style.visibility !== "hidden") {
       for (const word of captions.querySelectorAll(".w")) consider(word, captions, true);
     }
+    for (const element of contrastHidden) element.dataset.mtHideGlyphs = "";
     return targets;
   }
 
   // Step 2: `screenshot` is a data: URL of the frame with those glyphs hidden. Returns {key, measured, message} for each
-  // target that fails: the contrast of its colour against what is behind it, judged on the worst 5% of that area (a few bright specks pass; a bright patch
-  // fails). A text outline (the captions' stroke) counts as background.
+  // target that fails: the contrast of its colour against what is behind it, judged on the worst 5% of the element's
+  // own shape (a few bright specks pass; a bright patch fails). A text outline (the captions' stroke) counts as background.
   async function contrastMeasure(screenshot, targets) {
     for (const element of contrastHidden) delete element.dataset.mtHideGlyphs;
     contrastHidden = [];
@@ -656,6 +700,7 @@
       const ratios = [];
       for (let row = 0; row < height; row += step) {
         for (let column = 0; column < width; column += step) {
+          if (target.quad && !insideQuad(target.quad, (left + column + 0.5) / scale, (top + row + 0.5) / scale)) continue;
           const offset = (row * width + column) * 4;
           let behind = [pixels[offset], pixels[offset + 1], pixels[offset + 2]];
           if (target.stroke) behind = behind.map((value, channel) => target.stroke[channel] * target.stroke[3] + value * (1 - target.stroke[3]));
@@ -664,6 +709,7 @@
         }
       }
       ratios.sort((one, other) => one - other);
+      if (!ratios.length) continue;
       const measured = ratios[Math.floor(ratios.length * 0.05)];
       const needed = target.large ? 3 : 4.5;
       if (measured < needed) {

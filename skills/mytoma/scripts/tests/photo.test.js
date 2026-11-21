@@ -142,6 +142,27 @@ test("check fails text over a photo below WCAG AA, and passes it once the tint i
   assert.match(strong.output, /^clean/m);
 });
 
+test("contrast reads each element's own colour and shape: a span inside a heading, a rotated stamp", () => {
+  const result = check(makeWork("contrast-shapes", {
+    style: "#tag { background: var(--brand-bg); color: var(--brand-text); transform: rotate(-12deg); }",
+    shots: `<section class="shot" id="s01"><img id="p1" src="assets/white-01.jpg" alt="">
+      <h1 class="lg" id="head" style="background:var(--brand-bg)">dark <span id="inner" style="color:#fff">words</span></h1>
+      <span class="stamp" id="tag">rotated</span></section>`,
+    timeline: `shot("s01", 0, 2); photo("#p1", 0, 2, {tint: "none"}); MT.finish();`,
+  }));
+  assert.strictEqual(result.code, 0, result.output);
+});
+
+test("contrast is judged on settled text, not mid-entry", () => {
+  // a dark card popping in at 1.6s: check samples 1.7s, mid-pop, when the card is still half transparent
+  const settling = check(makeWork("contrast-settling", {
+    shots: `<section class="shot" id="s01"><img id="p1" src="assets/white-01.jpg" alt="">
+      <div id="card" style="background:var(--brand-bg);padding:30px"><p id="label" style="font-size:36px;margin:0">on a dark card</p></div></section>`,
+    timeline: `shot("s01", 0, 2); photo("#p1", 0, 2, {tint: "none"}); pop("#card", 1.6); MT.finish();`,
+  }));
+  assert.strictEqual(settling.code, 0, settling.output);
+});
+
 test("captions over a photo need 4.5:1; their outline counts", () => {
   const captions = { words: [{ w: "readable", s: 0.1, e: 1.9 }], phrases: [{ a: 0, b: 1, s: 0.1, e: 1.9 }] };
   const shots = `<section class="shot" id="s01"><img id="p1" src="assets/white-01.jpg" alt=""></section>`;
