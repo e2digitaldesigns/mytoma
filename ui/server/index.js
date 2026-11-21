@@ -181,7 +181,11 @@ app.get("/files/:id/*", (req, res, next) => {
   const dir = projectDir(req.params.id);
   const rel = req.params[0];
   if (!rel || rel.split("/").some((p) => p === ".." || p.startsWith("."))) return next(httpError(400, "bad path"));
-  res.sendFile(rel, { root: dir, dotfiles: "deny", headers: { "Cache-Control": "no-store" } }, (e) => e && next(httpError(404, "not found")));
+  res.sendFile(rel, { root: dir, dotfiles: "deny", headers: { "Cache-Control": "no-store" } }, (e) => {
+    // a request the browser dropped mid-file (a seek, or the preview moving to the next frame) is not an error
+    if (!e || res.headersSent) return;
+    next(httpError(404, "not found"));
+  });
 });
 
 /* ---------- the web app ---------- */
@@ -192,6 +196,7 @@ if (fs.existsSync(config.web)) {
 }
 
 app.use((err, req, res, next) => {   // eslint-disable-line no-unused-vars
+  if (res.headersSent) return res.end();
   const status = err.status || 500;
   if (status >= 500) console.error(err);
   res.status(status).json({ error: err.message });
