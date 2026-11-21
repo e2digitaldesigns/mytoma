@@ -40,6 +40,7 @@ const ARGS = [
   "--disable-background-networking",
   "--disable-component-update",
   "--disable-sync",
+  "--allow-browser-signin=false",
   "--disable-default-apps",
   "--no-first-run",
   "--no-default-browser-check",

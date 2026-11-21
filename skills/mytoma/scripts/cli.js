@@ -24,7 +24,7 @@ const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
 const { spawn, spawnSync } = require("child_process");
-const { launch, openComposition, findChrome, capture } = require("./lib/browser");
+const { launch, openComposition, findChrome, capture, readComp } = require("./lib/browser");
 
 const SKILL_DIR = path.resolve(__dirname, "..");
 const TEMPLATE_DIR = path.join(SKILL_DIR, "template");
@@ -96,7 +96,13 @@ function installVendor(dir) {
 
 function cmdNew(pos, opt) {
   const { dir, html } = workPaths(pos[0]);
-  const format = opt.format || "vertical";
+  // Re-running on an existing composition keeps its size, frame rate and duration unless a flag changes them
+  const prev = fs.existsSync(html) && !opt.force ? (() => { try { return readComp(html); } catch { return null; } })() : null;
+  const prevFormat = prev && Object.keys(FORMATS).find((k) => FORMATS[k][0] === prev.width && FORMATS[k][1] === prev.height);
+  if (prev && !opt.format && !prevFormat) die(`${html}: its size ${prev.width}x${prev.height} is not one of the formats; pass --format`);
+  if (prev && !opt.duration) opt.duration = prev.duration;
+  if (prev && !opt.fps) opt.fps = prev.fps;
+  const format = opt.format || prevFormat || "vertical";
   if (!FORMATS[format]) die(`--format must be one of ${Object.keys(FORMATS).join(", ")}`);
   const [width, height] = FORMATS[format];
   const fps = opt.fps ? num(opt.fps, "fps") : 30;
@@ -120,6 +126,8 @@ function cmdNew(pos, opt) {
   installVendor(dir);
   const words = path.join(dir, "words.js");
   if (!fs.existsSync(words)) fs.writeFileSync(words, "window.CAPTIONS = null;  // captions.py replaces this\n");
+  const edit = path.join(dir, "edit.js");
+  if (!fs.existsSync(edit)) fs.writeFileSync(edit, "window.EDIT = null;  // the UI writes stretches and chapters here\n");
   console.log(`${html}\nNext: author shots between BEGIN/END SHOTS and BEGIN/END TIMELINE, then: node cli.js check ${pos[0]}`);
 }
 
@@ -131,12 +139,18 @@ async function cmdCheck(pos) {
   try {
     const { page, info, warnings } = await openComposition(browser, html);
     const issues = [];
-    for (const s of info.shots) {
+    const late = info.shots.filter((s) => s.e > info.duration + 1e-6);
+    for (const s of late) {
+      issues.push(`${s.id}: ${s.s >= info.duration ? "starts" : "ends"} at ${s[s.s >= info.duration ? "s" : "e"]}s, after the video ends (${info.duration}s); fix the shot or run: node cli.js new <work> --duration <seconds>`);
+    }
+    for (const s of info.shots.filter((x) => x.s < info.duration)) {
       for (const k of [0.25, 0.5, 0.85]) {
         const t = s.s + (s.e - s.s) * k;
         issues.push(...(await page.evaluate((t) => window.MT.check(t), t)));
       }
     }
+    // projects made before stretches existed have an engine copy without checkEdit (`new` refreshes it)
+    issues.push(...(await page.evaluate(() => (window.MT.checkEdit ? window.MT.checkEdit() : []))));
     const unique = [...new Set(issues.map((i) => i.replace(/ @[\d.]+s:/, ":")))];
     warnings.forEach((w) => console.log("warn  " + w));
     if (unique.length) {

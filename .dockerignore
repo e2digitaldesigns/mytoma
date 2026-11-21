@@ -1,0 +1,11 @@
+.git
+**/node_modules
+**/__pycache__
+**/*.pyc
+ui/web/dist
+docs/*.mp4
+docs/*.m4a
+projects
+work
+out
+.env

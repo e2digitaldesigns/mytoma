@@ -1,0 +1,27 @@
+# myToma studio in Docker. Copy .env.example to .env, fill it in, then: docker compose up -d --build
+# With an Nvidia GPU for transcription: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+services:
+  studio:
+    build:
+      context: .
+      args:
+        GPU: "${MYTOMA_GPU:-0}"
+    image: mytoma-studio
+    restart: unless-stopped
+    ports:
+      # Bind to your Tailscale address (tailscale ip -4) so only your devices reach it; never 0.0.0.0 on a router-facing machine
+      - "${MYTOMA_BIND:-127.0.0.1}:4173:4173"
+    environment:
+      MYTOMA_PASSWORD: "${MYTOMA_PASSWORD:?set MYTOMA_PASSWORD in .env}"
+      # the projects folder as this computer sees it, so the studio tells Claude the right path
+      MYTOMA_PROJECTS_HOST: "${MYTOMA_PROJECTS_DIR:?set MYTOMA_PROJECTS_DIR in .env}"
+    volumes:
+      # projects: a normal folder on this computer, so Claude (outside the container) can edit them
+      - "${MYTOMA_PROJECTS_DIR}:/data/projects"
+      # your recordings, read-only: pick takes by path without uploading or copying them
+      - "${MYTOMA_RECORDINGS:?set MYTOMA_RECORDINGS in .env}:/media:ro"
+      # the speech model, downloaded once
+      - mytoma-models:/data/models
+
+volumes:
+  mytoma-models:
