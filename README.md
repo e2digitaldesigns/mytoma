@@ -8,7 +8,7 @@ renders the same video.
 
 Private repository. All rights reserved.
 
-## Quickstart (step 1: the render engine)
+## Quickstart
 
 ```bash
 cd skills/mytoma/scripts
@@ -16,9 +16,11 @@ bash setup.sh                                   # GSAP, Playwright, fonts, Chrom
 node cli.js new ~/mytoma/demo                   # a 10-second demo composition
 node cli.js check ~/mytoma/demo                 # layout and page-error check
 node cli.js stills ~/mytoma/demo 1.6,3.6,6.6,9.6  # stills + contact.jpg
-node cli.js render ~/mytoma/demo --draft        # fast preview
+node cli.js sound ~/mytoma/demo --drop 9.3      # soundtrack from the timeline's cues → audio/mix.wav
+node cli.js render ~/mytoma/demo --draft        # fast preview (muxes the soundtrack)
 node cli.js render ~/mytoma/demo                # final: 2x supersampled, CRF 16, BT.709
-npm test                                        # determinism and engine tests
+npm test                                        # engine, sound and mixer tests
+python3 audio/library.py preview ~/reel.wav     # every sound in the library, to listen to
 ```
 
 On a machine with an Nvidia GPU, `MYTOMA_CHROME_ARGS="--enable-gpu --use-angle=vulkan"` lets Chromium
@@ -36,7 +38,7 @@ Install as a Claude Code plugin (needs `gh`/git signed in to an account with acc
 Built in steps, one pull request each:
 
 1. Render engine: template, `renderAt(t)`, helpers, Playwright → ffmpeg ✅
-2. Sound: cue extraction, bundled sound library, mix
+2. Sound: cue extraction, bundled sound library, mix ✅
 3. Talking-head workflow: transcription, trim, word-timed captions, face shots
 4. The skill layer: `SKILL.md`, block catalogue, worked example
 5. Claude app compatibility

@@ -185,6 +185,10 @@
   // Sound-only cues for beats with no element: a riser into a reveal, a "down" out of one
   function riser(s, e) { cue(s, "riser", { dur: e - s }); }
   function down(s, e) { cue(s, "down", { dur: e - s }); }
+  // Any library entry by id, e.g. sfx(4.2, "impact.heavy") or sfx(6, "foley.shutter", {gain: 0.6})
+  function sfx(t, entry, opts = {}) { cue(t, entry, opts); }
+  // A loop under a stretch: bed(0, 12, "texture.projector") · bed(30, 41, "bed.heartbeat", {gain: 0.5})
+  function bed(s, e, entry, opts = {}) { cue(s, entry, Object.assign({ dur: e - s }, opts)); }
 
   /* ---------- film finish ---------- */
 
@@ -305,11 +309,11 @@
   applyBrand();
 
   const MT = { tl, cue, addDrawer, rand, shot, slam, pop, rise, fadeIn, stagger, stamp, highlight, strike, shake, hit,
-    kenBurns, drift, punchIn, typer, counter, riser, down, renderAt, check, finish, SFX, SHOTS, NOCAP, W, H, FPS, D };
+    kenBurns, drift, punchIn, typer, counter, riser, down, sfx, bed, renderAt, check, finish, SFX, SHOTS, NOCAP, W, H, FPS, D };
   window.MT = MT;
   window.renderAt = renderAt;
   window.SFX = SFX;
   // Helpers as globals, so a composition reads like a shot list: shot(...); slam(...); hit(...)
   for (const k of ["tl", "cue", "addDrawer", "shot", "slam", "pop", "rise", "fadeIn", "stagger", "stamp", "highlight",
-    "strike", "shake", "hit", "kenBurns", "drift", "punchIn", "typer", "counter", "riser", "down"]) window[k] = MT[k];
+    "strike", "shake", "hit", "kenBurns", "drift", "punchIn", "typer", "counter", "riser", "down", "sfx", "bed"]) window[k] = MT[k];
 })();

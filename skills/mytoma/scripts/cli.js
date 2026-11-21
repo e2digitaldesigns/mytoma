@@ -7,12 +7,15 @@
  *   node cli.js check   <work>                       layout problems, page errors; exit 1 on findings
  *   node cli.js stills  <work> <t,t,t> [--scale 1]   one JPEG per time into <work>/stills/, plus contact.jpg
  *   node cli.js cues    <work>                       sound cues the timeline pushed → <work>/cues.json
- *   node cli.js render  <work> [--draft] [--workers N] [--chunk 10] [--out file.mp4]
+ *   node cli.js sound   <work> [--music synth|none|<file>|<entry>] [--voice <file>] [--drop <t>] [--drums-from <t>]
+ *                              [--sfx 0.5] [--music-level 0.22] [--map hit=impact.heavy,…]   → <work>/audio/mix.wav
+ *   node cli.js render  <work> [--draft] [--workers N] [--chunk 10] [--out file.mp4] [--no-audio]
  *   node cli.js doctor                               Chromium, ffmpeg and Node, with the fix for anything missing
  *
  * render streams frames from Chromium straight into ffmpeg in chunks (no frames on disk), encodes each
  * chunk in parallel, and joins them. A killed render resumes: finished chunks are kept, keyed by a hash of
- * the composition, so any edit to it starts fresh automatically.
+ * the composition, so any edit to it starts fresh automatically. When <work>/audio/mix.wav exists it is muxed
+ * in; if the timeline's cues changed since the last `sound`, the mix is rebuilt first with the same options.
  */
 
 const fs = require("fs");
@@ -25,6 +28,8 @@ const { launch, openComposition, findChrome, capture } = require("./lib/browser"
 const SKILL_DIR = path.resolve(__dirname, "..");
 const TEMPLATE_DIR = path.join(SKILL_DIR, "template");
 const MODULES = path.join(__dirname, "node_modules");
+const PYTHON = process.env.MYTOMA_PYTHON || "python3";
+const MIX = path.join(__dirname, "audio", "mix.py");
 const FORMATS = { vertical: [1080, 1920], landscape: [1920, 1080], square: [1080, 1080], portrait: [1080, 1350] };
 
 /* ---------- args ---------- */
@@ -163,16 +168,61 @@ async function cmdStills(pos, opt) {
 
 /* ---------- cues ---------- */
 
+// Writes <work>/cues.json; returns its sha (the key mix.json records, so a stale mix is detectable)
+async function writeCues(browser, dir, html) {
+  const { page, context, info } = await openComposition(browser, html);
+  const cues = await page.evaluate(() => window.SFX);
+  await context.close();
+  const text = JSON.stringify(cues, null, 1);
+  fs.writeFileSync(path.join(dir, "cues.json"), text);
+  const counts = cues.reduce((m, c) => ((m[c.type] = (m[c.type] || 0) + 1), m), {});
+  const summary = `${cues.length} sound cues → cues.json · ${Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(" · ")}`;
+  return { sha: crypto.createHash("sha256").update(text).digest("hex").slice(0, 16), info, summary };
+}
+
 async function cmdCues(pos) {
   const { dir, html } = workPaths(pos[0]);
   const browser = await launch();
-  try {
-    const { page } = await openComposition(browser, html);
-    const cues = await page.evaluate(() => window.SFX);
-    fs.writeFileSync(path.join(dir, "cues.json"), JSON.stringify(cues, null, 1));
-    const counts = cues.reduce((m, c) => ((m[c.type] = (m[c.type] || 0) + 1), m), {});
-    console.log(`${cues.length} sound cues → cues.json · ${Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(" · ")}`);
-  } finally { await browser.close(); }
+  try { console.log((await writeCues(browser, dir, html)).summary); } finally { await browser.close(); }
+}
+
+/* ---------- sound ---------- */
+
+const MIX_FLAGS = ["music", "voice", "drop", "drums-from", "sfx", "music-level", "map", "target", "true-peak"];
+
+function runMix(dir, duration, options) {
+  const args = [MIX, dir, "--duration", String(duration)];
+  for (const k of MIX_FLAGS) if (options[k] !== undefined && options[k] !== null && options[k] !== true) args.push(`--${k}`, String(options[k]));
+  const r = spawnSync(PYTHON, args, { stdio: "inherit" });
+  if (r.error) die(`Could not run ${PYTHON}: ${r.error.message}\nInstall Python 3.10+ with numpy and scipy (scripts/setup.sh checks), or set MYTOMA_PYTHON.`);
+  if (r.status !== 0) die("The mix failed (see above)", r.status || 1);
+}
+
+async function cmdSound(pos, opt) {
+  const { dir, html } = workPaths(pos[0]);
+  if (opt.voice && !fs.existsSync(path.resolve(String(opt.voice)))) die(`--voice: no such file: ${opt.voice}`);
+  if (opt.voice) opt.voice = path.resolve(String(opt.voice));
+  if (opt.music && !["synth", "none"].includes(opt.music) && fs.existsSync(path.resolve(String(opt.music)))) opt.music = path.resolve(String(opt.music));
+  const browser = await launch();
+  let cues;
+  try { cues = await writeCues(browser, dir, html); } finally { await browser.close(); }
+  console.log(cues.summary);
+  runMix(dir, cues.info.duration, opt);
+  console.log(`Next: node cli.js render ${pos[0]}  (muxes audio/mix.wav)`);
+}
+
+// Before muxing: if the cues changed since the last mix, rebuild it with the options it was made with
+async function freshMix(browser, dir, html) {
+  const report = path.join(dir, "audio", "mix.json");
+  if (!fs.existsSync(report)) return null;
+  const mix = JSON.parse(fs.readFileSync(report, "utf8"));
+  const { sha, info, summary } = await writeCues(browser, dir, html);
+  if (sha !== mix.cues_sha || Math.abs((mix.duration || 0) - info.duration) > 1e-6) {
+    console.log(`the timeline's sound cues changed since the last mix: re-mixing with the same options\n${summary}`);
+    const o = Object.fromEntries(Object.entries(mix.options || {}).map(([k, v]) => [k.replace(/_/g, "-"), v]));
+    runMix(dir, info.duration, o);
+  }
+  return path.join(dir, "audio", "mix.wav");
 }
 
 /* ---------- render ---------- */
@@ -232,6 +282,33 @@ async function renderChunk(page, cdp, info, q, chunk) {
   fs.renameSync(chunk.part, chunk.file);   // a chunk exists only once it is complete
 }
 
+// True peak (dBTP) of a file's decoded audio, as a player will see it
+function truePeak(file) {
+  const r = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-i", file, "-map", "0:a", "-af", "ebur128=peak=true", "-f", "null", "-"], { encoding: "utf8" });
+  const m = String(r.stderr).match(/True peak:\s*\n\s*Peak:\s*(-?[\d.]+|-inf)/);
+  return m ? Number(m[1] === "-inf" ? -Infinity : m[1]) : NaN;
+}
+
+// Lossy encoders overshoot on sharp transients. Measured over random myToma mixes, ffmpeg's default AAC
+// coder ("twoloop") overshot by up to 4.1 dB; the "fast" coder at 192k by at most 1.6 dB. The mix leaves
+// 2 dB of headroom for this; if the encoded audio still passes -1 dBTP, turn the mix down by the excess
+// and encode again.
+function muxAudio(video, audio, out, duration, ceiling = -1.0) {
+  let trim = 0, tp = NaN;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const af = trim ? ["-af", `volume=${trim.toFixed(2)}dB`] : [];
+    const m = spawnSync("ffmpeg", ["-v", "error", "-y", "-i", video, "-i", audio, "-map", "0:v", "-map", "1:a",
+      "-c:v", "copy", ...af, "-c:a", "aac", "-aac_coder", "fast", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-t", String(duration),
+      "-movflags", "+faststart", out], { stdio: "inherit" });
+    if (m.status !== 0) die("ffmpeg failed to mux the soundtrack");
+    tp = truePeak(out);
+    if (!(tp > ceiling)) return tp;
+    trim -= tp - ceiling + 0.1;
+  }
+  console.log(`warning: encoded audio still peaks at ${tp.toFixed(1)} dBTP after trimming ${trim.toFixed(1)} dB`);
+  return tp;
+}
+
 async function cmdRender(pos, opt) {
   const { dir, html } = workPaths(pos[0]);
   const draft = !!opt.draft || process.env.MYTOMA_QUALITY === "draft";
@@ -257,11 +334,15 @@ async function cmdRender(pos, opt) {
     await probe.context.close();
     const per = Math.max(1, Math.round(chunkSec * info.fps));
     const chunks = [];
-    for (let from = 0, i = 0; from < info.frames; from += per, i++) {
+    for (let from = 0; from < info.frames; from += per) {
       const to = Math.min(info.frames, from + per);
-      const name = `c${String(i).padStart(4, "0")}`;
+      // named by exact frame range: a different --chunk size never re-uses a chunk with other frames in it
+      const name = `f${String(from).padStart(6, "0")}-${String(to - 1).padStart(6, "0")}`;
       chunks.push({ from, to, file: path.join(chunkDir, `${name}.mp4`), part: path.join(chunkDir, `${name}.part.mp4`) });
     }
+    // chunks from another --chunk size are not part of this plan: free their disk
+    const planned = new Set(chunks.map((c) => path.basename(c.file)));
+    for (const f of fs.readdirSync(chunkDir)) if (/^f\d+-\d+(\.part)?\.mp4$/.test(f) && !planned.has(f)) fs.rmSync(path.join(chunkDir, f));
     const todo = chunks.filter((c) => !fs.existsSync(c.file));
     const doneFrames = info.frames - todo.reduce((n, c) => n + (c.to - c.from), 0);
     console.log(`${info.frames} frames · ${info.width}x${info.height} @ ${info.fps} fps · ${q.name} (${q.scale}x ${q.format}) · ` +
@@ -293,12 +374,26 @@ async function cmdRender(pos, opt) {
     const list = path.join(chunkDir, "concat.txt");
     fs.writeFileSync(list, chunks.map((c) => `file '${c.file.replace(/'/g, "'\\''")}'`).join("\n") + "\n");
     fs.mkdirSync(path.dirname(out), { recursive: true });
-    const r = spawnSync("ffmpeg", ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", list, "-c", "copy", "-movflags", "+faststart", out], { stdio: "inherit" });
+    const audio = opt["no-audio"] ? null : await freshMix(browser, dir, html);
+    const joined = audio ? path.join(chunkDir, "video.mp4") : out;
+    const r = spawnSync("ffmpeg", ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", list, "-c", "copy", "-movflags", "+faststart", joined], { stdio: "inherit" });
     if (r.status !== 0) die("ffmpeg failed to join the chunks");
+    const joinedFrames = countFrames(joined);
+    if (joinedFrames !== info.frames) {
+      fs.rmSync(joined, { force: true });
+      die(`Joined video has ${joinedFrames} frames, expected ${info.frames}; chunks are inconsistent. Delete ${chunkDir} and render again.`);
+    }
+    if (audio) {
+      const tp = muxAudio(joined, audio, out, info.duration);
+      console.log(`soundtrack muxed · AAC 192k · ${tp.toFixed(1)} dBTP after encoding`);
+      fs.rmSync(joined, { force: true });
+    } else if (!opt["no-audio"]) {
+      console.log(`no soundtrack yet (video only): node cli.js sound ${pos[0]} builds one`);
+    }
     const total = countFrames(out);
     if (total !== info.frames) die(`Joined video has ${total} frames, expected ${info.frames}`);
     const size = fs.statSync(out).size;
-    console.log(`${out}\n${info.width}x${info.height} · ${info.duration}s · ${total} frames · ${(size / 1e6).toFixed(1)} MB · rendered in ${fmtTime((Date.now() - started) / 1000)}`);
+    console.log(`${out}\n${info.width}x${info.height} · ${info.duration}s · ${total} frames · ${(size / 1e6).toFixed(1)} MB · ${audio ? "with sound" : "no sound"} · rendered in ${fmtTime((Date.now() - started) / 1000)}`);
     console.log("Next: extract a frame from the mp4 and look at it (the encoded file is the proof, not a still)");
   } finally { await browser.close(); }
 }
@@ -317,14 +412,18 @@ function cmdDoctor() {
   line(ff.status === 0, "ffmpeg", "install ffmpeg (brew install ffmpeg · sudo apt install ffmpeg)");
   if (ff.status === 0) line(/libx264/.test(ff.stdout), "ffmpeg libx264", "use an ffmpeg build with libx264");
   line(fs.existsSync(path.join(MODULES, "gsap/dist/gsap.min.js")), "gsap + fonts (node_modules)", "run scripts/setup.sh");
+  const py = spawnSync(PYTHON, ["-c", "import sys, numpy, scipy; assert sys.version_info >= (3, 10); print(sys.version.split()[0])"], { encoding: "utf8" });
+  line(py.status === 0, `python ${String(py.stdout || "").trim()} + numpy + scipy (sound)`, `pip install numpy scipy  (Python 3.10+; or set MYTOMA_PYTHON)`);
+  const lib = path.join(SKILL_DIR, "sounds", "library.json");
+  line(fs.existsSync(lib), "sound library", `python3 ${path.join("audio", "library.py")} build`);
   console.log(bad ? `${bad} problem(s)` : "ready");
   process.exitCode = bad ? 1 : 0;
 }
 
 /* ---------- main ---------- */
 
-const COMMANDS = { new: cmdNew, check: cmdCheck, stills: cmdStills, cues: cmdCues, render: cmdRender, doctor: cmdDoctor };
+const COMMANDS = { new: cmdNew, check: cmdCheck, stills: cmdStills, cues: cmdCues, sound: cmdSound, render: cmdRender, doctor: cmdDoctor };
 const [cmd, ...rest] = process.argv.slice(2);
-if (!COMMANDS[cmd]) die("Usage: node cli.js new|check|stills|cues|render|doctor <work> …\nSee the header of cli.js for options.");
+if (!COMMANDS[cmd]) die("Usage: node cli.js new|check|stills|cues|sound|render|doctor <work> …\nSee the header of cli.js for options.");
 const { pos, opt } = parseArgs(rest);
 Promise.resolve(COMMANDS[cmd](pos, opt)).catch((e) => { console.error(e.message || e); process.exit(1); });

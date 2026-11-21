@@ -1,0 +1,407 @@
+{
+  "version": 1,
+  "sample_rate": 48000,
+  "cues": {
+    "hit": "impact.punch",
+    "stamp": "impact.stamp",
+    "whoosh": "whoosh.fast",
+    "riser": "riser.tension",
+    "down": "down.drop",
+    "pop": "ui.pop",
+    "tick": "ui.tick",
+    "type": "foley.key",
+    "ding": "ui.ding",
+    "error": "ui.error",
+    "click": "ui.click",
+    "shutter": "foley.shutter",
+    "paper": "foley.paper"
+  },
+  "sounds": {
+    "bed.drone": {
+      "files": [
+        "bed/drone-01.ogg"
+      ],
+      "kind": "loop",
+      "peak_db": -12,
+      "tags": [
+        "bed",
+        "dark",
+        "drone",
+        "tension",
+        "loop"
+      ],
+      "description": "Dark drone loop under a tense stretch",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    },
+    "bed.heartbeat": {
+      "files": [
+        "bed/heartbeat-01.ogg"
+      ],
+      "kind": "loop",
+      "peak_db": -10,
+      "tags": [
+        "bed",
+        "tension",
+        "suspense",
+        "loop"
+      ],
+      "description": "Heartbeat loop at 60 bpm",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    },
+    "down.drop": {
+      "files": [
+        "down/drop-01.ogg"
+      ],
+      "kind": "tail",
+      "peak_db": -7,
+      "tags": [
+        "fall",
+        "deflate",
+        "fail"
+      ],
+      "description": "Falling tone: a let-down, a failure",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    },
+    "foley.key": {
+      "files": [
+        "foley/key-01.ogg",
+        "foley/key-02.ogg",
+        "foley/key-03.ogg"
+      ],
+      "kind": "repeat",
+      "peak_db": -12,
+      "tags": [
+        "typing",
+        "keyboard",
+        "modern",
+        "code"
+      ],
+      "description": "Keyboard keystroke, repeated for typing",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe",
+      "interval": 0.06,
+      "jitter": 0.035
+    },
+    "foley.paper": {
+      "files": [
+        "foley/paper-01.ogg",
+        "foley/paper-02.ogg"
+      ],
+      "kind": "oneshot",
+      "peak_db": -12,
+      "tags": [
+        "paper",
+        "document",
+        "archival"
+      ],
+      "description": "Paper slide: a document or file appears",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    },
+    "foley.shutter": {
+      "files": [
+        "foley/shutter-01.ogg"
+      ],
+      "kind": "oneshot",
+      "peak_db": -8,
+      "tags": [
+        "camera",
+        "photo",
+        "archival"
+      ],
+      "description": "Camera shutter: an archival photo lands",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    },
+    "foley.typewriter": {
+      "files": [
+        "foley/typewriter-01.ogg",
+        "foley/typewriter-02.ogg",
+        "foley/typewriter-03.ogg"
+      ],
+      "kind": "repeat",
+      "peak_db": -10,
+      "tags": [
+        "typing",
+        "typewriter",
+        "history",
+        "dates",
+        "names"
+      ],
+      "description": "Typewriter strike, repeated: dates, names, archival text",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe",
+      "interval": 0.1,
+      "jitter": 0.05
+    },
+    "impact.heavy": {
+      "files": [
+        "impact/heavy-01.ogg",
+        "impact/heavy-02.ogg"
+      ],
+      "kind": "oneshot",
+      "peak_db": -2,
+      "tags": [
+        "hit",
+        "cinematic",
+        "dark",
+        "reveal",
+        "dramatic"
+      ],
+      "description": "Cinematic sub boom with a long tail: reveals, dark turns, endings",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    },
+    "impact.punch": {
+      "files": [
+        "impact/punch-01.ogg",
+        "impact/punch-02.ogg",
+        "impact/punch-03.ogg"
+      ],
+      "kind": "oneshot",
+      "peak_db": -3,
+      "tags": [
+        "hit",
+        "punchy",
+        "slam",
+        "energy"
+      ],
+      "description": "Punchy hit with a short boom: slams, strikes, emphasis",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    },
+    "impact.soft": {
+      "files": [
+        "impact/soft-01.ogg",
+        "impact/soft-02.ogg"
+      ],
+      "kind": "oneshot",
+      "peak_db": -6,
+      "tags": [
+        "hit",
+        "soft",
+        "subtle"
+      ],
+      "description": "Soft thud for quiet emphasis",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    },
+    "impact.stamp": {
+      "files": [
+        "impact/stamp-01.ogg",
+        "impact/stamp-02.ogg"
+      ],
+      "kind": "oneshot",
+      "peak_db": -4,
+      "tags": [
+        "stamp",
+        "thud",
+        "verdict"
+      ],
+      "description": "Rubber-stamp thud",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    },
+    "riser.short": {
+      "files": [
+        "riser/short-01.ogg"
+      ],
+      "kind": "riser",
+      "peak_db": -6,
+      "tags": [
+        "build",
+        "short"
+      ],
+      "description": "1.5 s build",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    },
+    "riser.tension": {
+      "files": [
+        "riser/tension-01.ogg"
+      ],
+      "kind": "riser",
+      "peak_db": -6,
+      "tags": [
+        "build",
+        "tension",
+        "suspense"
+      ],
+      "description": "4 s tension build that stops dead on the reveal",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    },
+    "texture.crackle": {
+      "files": [
+        "texture/crackle-01.ogg"
+      ],
+      "kind": "loop",
+      "peak_db": -18,
+      "tags": [
+        "texture",
+        "vinyl",
+        "old",
+        "history",
+        "loop"
+      ],
+      "description": "Old-record crackle loop",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    },
+    "texture.projector": {
+      "files": [
+        "texture/projector-01.ogg"
+      ],
+      "kind": "loop",
+      "peak_db": -16,
+      "tags": [
+        "texture",
+        "film",
+        "archival",
+        "history",
+        "loop"
+      ],
+      "description": "Film projector loop under archival footage",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    },
+    "ui.click": {
+      "files": [
+        "ui/click-01.ogg",
+        "ui/click-02.ogg"
+      ],
+      "kind": "oneshot",
+      "peak_db": -12,
+      "tags": [
+        "ui",
+        "click",
+        "select"
+      ],
+      "description": "Small click: a selection, a toggle",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    },
+    "ui.ding": {
+      "files": [
+        "ui/ding-01.ogg"
+      ],
+      "kind": "oneshot",
+      "peak_db": -10,
+      "tags": [
+        "ui",
+        "success",
+        "correct"
+      ],
+      "description": "Bell: success, a correct answer",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    },
+    "ui.error": {
+      "files": [
+        "ui/error-01.ogg"
+      ],
+      "kind": "oneshot",
+      "peak_db": -12,
+      "tags": [
+        "ui",
+        "wrong",
+        "fail"
+      ],
+      "description": "Buzzer: wrong, failure",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    },
+    "ui.pop": {
+      "files": [
+        "ui/pop-01.ogg",
+        "ui/pop-02.ogg",
+        "ui/pop-03.ogg"
+      ],
+      "kind": "oneshot",
+      "peak_db": -9,
+      "tags": [
+        "ui",
+        "appear",
+        "light"
+      ],
+      "description": "Light pop as an item appears",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    },
+    "ui.tick": {
+      "files": [
+        "ui/tick-01.ogg",
+        "ui/tick-02.ogg"
+      ],
+      "kind": "repeat",
+      "peak_db": -14,
+      "tags": [
+        "ui",
+        "count",
+        "clock"
+      ],
+      "description": "Tick for counters and clocks",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe",
+      "interval": 0.07
+    },
+    "whoosh.fast": {
+      "files": [
+        "whoosh/fast-01.ogg",
+        "whoosh/fast-02.ogg",
+        "whoosh/fast-03.ogg"
+      ],
+      "kind": "oneshot",
+      "peak_db": -6,
+      "tags": [
+        "transition",
+        "whip",
+        "fast"
+      ],
+      "description": "Quick pass-by: whips, slides, zooms",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    },
+    "whoosh.slow": {
+      "files": [
+        "whoosh/slow-01.ogg",
+        "whoosh/slow-02.ogg"
+      ],
+      "kind": "oneshot",
+      "peak_db": -7,
+      "tags": [
+        "transition",
+        "airy",
+        "slow"
+      ],
+      "description": "Slow airy sweep: fades, reveals",
+      "licence": "own",
+      "credit": "myToma built-in (synthesized)",
+      "source": "recipe"
+    }
+  }
+}
